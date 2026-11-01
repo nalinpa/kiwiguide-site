@@ -200,15 +200,16 @@ main > .hero { margin-top: 0; display: grid; }
 .sc-name { bottom: 44px; font-family: "Overpass", system-ui, sans-serif; font-weight: 800; font-size: 1.4rem; line-height: 1.1; }
 .sc-brand { bottom: 14px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
 
-@media (min-width: 900px) {
-  .features-grid { grid-template-columns: 1fr 1fr; gap: 64px; align-items: stretch; }
+/* Side by side from tablet width */
+@media (min-width: 768px) {
+  .features-grid { grid-template-columns: 1fr 1fr; gap: 48px; align-items: stretch; }
   .features { align-self: center; }
   .panel { display: block; min-height: 460px; position: relative; margin: 0; border-radius: 24px; overflow: hidden; background: var(--teal); }
   .panel-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .panel::after { content: ""; position: absolute; inset: 0; background: rgba(6, 30, 33, 0.25); }
   /* Centre of the right-hand column */
-  .feat-visual { position: absolute; z-index: 2; top: 50%; left: calc(100% - (100% - 64px) / 4); transform: translate(-50%, -50%); width: 190px; margin: 0; }
-  .sharecard { width: 320px; transform: translate(-50%, -50%) rotate(-3deg); }
+  .feat-visual { position: absolute; z-index: 2; top: 50%; left: calc(100% - (100% - 48px) / 4); transform: translate(-50%, -50%); width: 190px; margin: 0; }
+  .sharecard { width: min(34vw, 320px); transform: translate(-50%, -50%) rotate(-3deg); }
 }
 
 /* Places strip */
@@ -286,10 +287,10 @@ main > .shots-sec {
 }
 .sign::before { left: 22%; }
 .sign::after { right: 22%; }
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .trip-photo { aspect-ratio: auto; min-height: 460px; }
   .sign::before, .sign::after { content: ""; }
-  .sign { position: absolute; right: 5%; bottom: 0; width: min(54%, 560px); margin: 0; padding-bottom: 72px; }
+  .sign { position: absolute; right: 4%; bottom: 0; width: min(58%, 560px); margin: 0; padding-bottom: 72px; }
   .sign::before, .sign::after { height: 110px; }
 }
 
@@ -301,7 +302,7 @@ main > .shots-sec {
 .day-list li::before { content: ""; position: absolute; left: -8px; top: 1.15em; width: 13px; height: 13px; border-radius: 50%; background: var(--paper); border: 3px solid var(--teal); }
 .day-list time { font-variant-numeric: tabular-nums; color: var(--muted); }
 @media (prefers-color-scheme: dark) { .day-list, .day-list li::before { border-color: var(--kiwi); } }
-@media (min-width: 900px) { .day { grid-template-columns: 1fr 1.2fr; gap: 64px; } }
+@media (min-width: 768px) { .day { grid-template-columns: 1fr 1.2fr; gap: 64px; } }
 
 /* Guide */
 main > .guide-sec {
@@ -318,7 +319,7 @@ main > .guide-sec {
 .topics li::before { content: ""; position: absolute; left: 0; top: 0.55em; width: 7px; height: 7px; background: var(--kiwi); transform: rotate(45deg); }
 .plates { display: flex; flex-wrap: wrap; gap: 10px; }
 .plates li { padding: 5px 12px; background: rgba(255, 255, 255, 0.12); border-radius: 8px; font-size: 0.98rem; }
-@media (min-width: 900px) { .guide-grid { grid-template-columns: 1fr 1fr; gap: 72px; } }
+@media (min-width: 768px) { .guide-grid { grid-template-columns: 1fr 1fr; gap: 72px; } }
 
 /* Final download: the campervan */
 .cta { position: relative; border-radius: 28px; overflow: hidden; min-height: 520px; display: flex; align-items: center; background: var(--teal-deep); }
@@ -358,3 +359,9 @@ footer p { margin-bottom: 0.6em; max-width: 90ch; }
 .legal-contact { margin-top: 3em; padding-top: 1.5em; border-top: 1px solid var(--line); }
 footer .brand { text-decoration: none; }
 .topbar .brand { text-decoration: none; }
+/* Bigger logo once there is room for it */
+@media (min-width: 768px) {
+  .topbar { padding-block: 24px; }
+  .topbar .brand { font-size: 1.6rem; gap: 14px; }
+  .topbar .brand img { width: 44px; height: 44px; }
+}

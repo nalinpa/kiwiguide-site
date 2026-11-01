@@ -42,4 +42,11 @@ Only use photos recorded in `docs/photo-sources.md`.
 
     npx wrangler deploy
 
-The first deploy creates the `kiwiguide` Worker on `*.workers.dev`. Attaching guide.kiwi is done in the Cloudflare dashboard (Worker, Settings, Domains & Routes).
+The first deploy creates the `kiwiguide` Worker and attaches guide.kiwi and www.guide.kiwi (set in `wrangler.jsonc`). That only works once guide.kiwi is an **active** zone on the Cloudflare account:
+
+1. Cloudflare dashboard, Add a domain: `guide.kiwi` (Free plan). Cloudflare gives you two nameservers.
+2. At the registrar, set guide.kiwi's nameservers to those two. Wait for Cloudflare to show the zone as Active (minutes to a day).
+3. Remove any old A, AAAA or CNAME records for `guide.kiwi` and `www` in Cloudflare DNS, or the custom domains can't be created.
+4. `npx wrangler deploy`. Cloudflare creates the DNS records and HTTPS certificates. Check https://guide.kiwi/ loads.
+
+www.guide.kiwi serves the same page; the canonical tag points search engines at https://guide.kiwi/. A redirect from www can be added later as a Cloudflare Redirect Rule.

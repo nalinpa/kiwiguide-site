@@ -108,20 +108,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .wrap { width: min(100% - 32px, 1120px); margin-inline: auto; }
 @media (min-width: 768px) { .wrap { width: min(100% - 64px, 1120px); } }
 .small { font-size: 0.92rem; color: var(--muted); }
-main > section { margin-block: clamp(64px, 9vw, 120px); position: relative; }
-/* Depth between sections: a soft shelf shadow in the gap between two light sections */
-main > section:not(.shots-sec):not(.guide-sec) + section:not(.shots-sec):not(.guide-sec)::before {
-  content: "";
-  position: absolute;
-  top: calc(clamp(64px, 9vw, 120px) / -2);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(100vw - 32px, 1120px);
-  height: 28px;
-  background: radial-gradient(50% 100% at 50% 0, var(--shade), transparent 100%);
-  border-top: 1px solid var(--line);
-  pointer-events: none;
-}
+main > section { margin-block: clamp(64px, 9vw, 120px); }
 .section-head { display: grid; gap: 14px; margin-bottom: clamp(28px, 4vw, 48px); }
 .section-head p { color: var(--muted); max-width: 56ch; margin: 0; font-size: 1.15rem; }
 @media (min-width: 1024px) {
@@ -132,7 +119,8 @@ main > section:not(.shots-sec):not(.guide-sec) + section:not(.shots-sec):not(.gu
 
 /* Top bar */
 /* The logo bar: its own colour, apart from the teal hero below it */
-.topbar { background: var(--bar); color: var(--ink); border-bottom: 1px solid var(--line); }
+/* Shadows only where the background colour changes */
+.topbar { position: relative; z-index: 2; background: var(--bar); color: var(--ink); box-shadow: 0 10px 24px -12px var(--shade-deep); }
 .topbar .wrap { padding-block: 16px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
 

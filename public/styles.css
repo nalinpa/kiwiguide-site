@@ -116,7 +116,13 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
 
 /* Hero: words, then the road photo with the app in it. From tablet width up they sit side by side. */
-main > .hero { margin-top: 0; display: grid; }
+/* The brand-teal band behind the logo bar and hero; deeper in dark mode so it still stands apart from the page */
+.masthead { background: linear-gradient(180deg, #074c54 0%, var(--teal) 100%); color: #fff; padding-bottom: clamp(40px, 6vw, 72px); }
+@media (prefers-color-scheme: dark) { .masthead { background: linear-gradient(180deg, #06323a 0%, #0a4950 100%); } }
+.masthead .lead { color: #d6e8e7; }
+.masthead .small { color: #c4dbda; }
+.masthead .soon::before { border-color: #fff; }
+.hero { display: grid; }
 .hero-copy { padding-block: 24px 28px; }
 .hero-copy h1 { margin-bottom: 20px; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
@@ -140,12 +146,12 @@ main > .hero { margin-top: 0; display: grid; }
   overflow: hidden;
   height: 440px;
   border-radius: 20px;
-  box-shadow: 0 50px 120px -50px rgba(9, 92, 101, 0.75);
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.55);
 }
 .stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% 30%; }
 .stage-phone { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; width: clamp(150px, 46vw, 190px); }
 @media (min-width: 768px) {
-  main > .hero { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(32px, 4.5vw, 64px); padding-top: clamp(8px, 2vw, 24px); }
+  .hero { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(32px, 4.5vw, 64px); padding-top: clamp(8px, 2vw, 24px); }
   .hero-copy { padding: 0; }
   .hero-copy h1 { font-size: clamp(3rem, 6.2vw, 5.25rem); }
   /* Tall enough to hold one big, whole, readable phone */

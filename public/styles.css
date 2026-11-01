@@ -53,6 +53,8 @@
   --kiwi: #ffc20e;
   --post: #9aa5a6;
   --bar: #ffffff;
+  --shade: rgba(6, 30, 33, 0.13);
+  --shade-deep: rgba(4, 22, 25, 0.45);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -64,6 +66,8 @@
     --night: #071113;
     --post: #5d6a6b;
     --bar: #071113;
+    --shade: rgba(0, 0, 0, 0.55);
+    --shade-deep: rgba(0, 0, 0, 0.7);
     color-scheme: dark;
   }
 }
@@ -104,7 +108,20 @@ ul { list-style: none; margin: 0; padding: 0; }
 .wrap { width: min(100% - 32px, 1120px); margin-inline: auto; }
 @media (min-width: 768px) { .wrap { width: min(100% - 64px, 1120px); } }
 .small { font-size: 0.92rem; color: var(--muted); }
-main > section { margin-block: clamp(64px, 9vw, 120px); }
+main > section { margin-block: clamp(64px, 9vw, 120px); position: relative; }
+/* Depth between sections: a soft shelf shadow in the gap between two light sections */
+main > section:not(.shots-sec):not(.guide-sec) + section:not(.shots-sec):not(.guide-sec)::before {
+  content: "";
+  position: absolute;
+  top: calc(clamp(64px, 9vw, 120px) / -2);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100vw - 32px, 1120px);
+  height: 28px;
+  background: radial-gradient(50% 100% at 50% 0, var(--shade), transparent 100%);
+  border-top: 1px solid var(--line);
+  pointer-events: none;
+}
 .section-head { display: grid; gap: 14px; margin-bottom: clamp(28px, 4vw, 48px); }
 .section-head p { color: var(--muted); max-width: 56ch; margin: 0; font-size: 1.15rem; }
 @media (min-width: 1024px) {
@@ -121,7 +138,7 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 
 /* Hero: words, then the road photo with the app in it. From tablet width up they sit side by side. */
 /* The brand-teal band behind the logo bar and hero; deeper in dark mode so it still stands apart from the page */
-.masthead { background: linear-gradient(180deg, #074c54 0%, var(--teal) 100%); color: #fff; padding-bottom: clamp(40px, 6vw, 72px); }
+.masthead { position: relative; z-index: 1; background: linear-gradient(180deg, #074c54 0%, var(--teal) 100%); color: #fff; padding-bottom: clamp(40px, 6vw, 72px); box-shadow: 0 20px 44px -22px var(--shade-deep); }
 @media (prefers-color-scheme: dark) { .masthead { background: linear-gradient(180deg, #06323a 0%, #0a4950 100%); } }
 .masthead .lead { color: #d6e8e7; }
 .masthead .small { color: #c4dbda; }
@@ -242,6 +259,7 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 }
 
 /* Screenshots: dark band */
+main > .shots-sec, main > .guide-sec { box-shadow: inset 0 26px 40px -26px var(--shade-deep), inset 0 -26px 40px -26px var(--shade-deep); }
 main > .shots-sec {
   background: var(--night);
   color: #e5eeed;

@@ -130,19 +130,18 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 @media (prefers-color-scheme: dark) { .masthead { background: linear-gradient(180deg, #06323a 0%, #0a4950 100%); } }
 .masthead .lead { color: #d6e8e7; }
 .masthead .small { color: #c4dbda; }
-.masthead .soon::before { border-color: #fff; }
 .hero { display: grid; }
 .hero-copy { padding-block: 32px 28px; }
 .hero-copy h1 { margin-bottom: 20px; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
-.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 20px; }
+.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; margin-top: 12px; }
 .hero-cta .small { margin: 0; }
-/* Not a button: the app isn't in the store yet. Swap for Apple's badge at launch (see README). */
-/* A status line, not a button: nothing to click until the app is in the store */
-.soon { display: inline-flex; align-items: center; gap: 10px; margin: 0; font-weight: 600; font-size: 1.1rem; }
-.soon::before { content: ""; width: 10px; height: 10px; background: var(--kiwi); border: 2px solid var(--ink); border-radius: 2px; transform: rotate(45deg); }
-.cta-copy .soon { margin-top: 20px; }
-.cta-copy .soon::before { border-color: #fff; }
+/* Apple's badge, unchanged: at least 40px high, clear space a quarter of its height */
+.badge { display: inline-block; border-radius: 9px; }
+.badge img { height: 54px; width: auto; margin: 14px 0; }
+.hero-cta .badge img { height: 50px; margin: 13px 0; }
+.cta-copy .badge { margin-top: 8px; }
+.footer-cols .footer-get { margin-top: 20px; }
 .phone {
   background: #0b1416;
   padding: 7px;

@@ -2,28 +2,19 @@
 
 A static site for the Kiwi Guide iPhone app: the home page plus `/privacy/` and `/terms/`. Plain HTML and CSS with no build step. Everything served lives in `public/`.
 
-## At launch
+## App Store links
 
-Until the app is approved the site says "Coming soon to the App Store" and has no download link. When it's live:
+Kiwi Guide is live: app id **6818057796**. The badges (hero and closing band), the footer link and the Smart App Banner use it.
 
-1. Get the app id (App Store Connect, App Information, Apple ID, digits only) and a provider token (Analytics, Acquisition, Campaigns, "Generate a campaign link").
-2. In `public/index.html`, replace both `<p class="soon">` labels with Apple's badge, linked through the campaign link so site downloads show in App Store Connect. The official badges are in `launch/`; copy them to `public/img/`. Keep the badge at least 40px high with clear space a quarter of its height around it.
-
-        <a class="badge" href="https://apps.apple.com/app/apple-store/id<APP_ID>?pt=<PROVIDER_TOKEN>&amp;ct=website&amp;mt=8">
-          <picture>
-            <source srcset="/img/app-store-badge-white.svg" media="(prefers-color-scheme: dark)">
-            <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54">
-          </picture>
-        </a>
-
-3. Add the Smart App Banner to the `<head>`: `<meta name="apple-itunes-app" content="app-id=<APP_ID>">`.
-4. Update the "coming soon" wording in the meta descriptions and the "Free at launch" lines.
+- Site links carry `ct=website`, the QR redirect `ct=qr`, so App Store Connect can split installs by source.
+- **Still to add:** the provider token (App Store Connect, Analytics, Acquisition, Campaigns, "Generate a campaign link"). Add `&pt=<token>` to every `apps.apple.com/app/apple-store/id6818057796` link in `public/index.html` and `public/_redirects`. Without it the links work but the campaigns aren't reported.
+- The badge is Apple's official black badge, unchanged; keep it at least 40px high with clear space a quarter of its height.
 
 Canonical, Open Graph, `robots.txt` and `sitemap.xml` already point at `https://guide.kiwi/`.
 
 ## QR code address: guide.kiwi/app
 
-Posters and stickers point at **https://guide.kiwi/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. Today it opens the home page; at launch, point it at the App Store campaign link with `ct=qr` (the file says how). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
+Posters and stickers point at **https://guide.kiwi/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. It opens Kiwi Guide on the App Store (`ct=qr`). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
 
 ## Privacy policy and terms
 

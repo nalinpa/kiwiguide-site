@@ -1,12 +1,39 @@
-// Rebuilds public/img from the app repo's store art.
-//   npm i --no-save sharp && node scripts/images.mjs [path/to/south-island]
+// Rebuilds public/img from the app repo's store art and the owner's photo folder.
+//   npm i --no-save sharp && node scripts/images.mjs [path/to/south-island] [path/to/Pictures/southisland]
 // Only images listed in docs/photo-sources.md may go on the site.
 import sharp from "sharp";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const app = process.argv[2] ?? "../south-island";
+const pics = process.argv[3] ?? join(process.env.USERPROFILE ?? "", "Pictures/southisland");
 const out = "public/img";
+
+// [source in the photo folder, output name]. Open licences only; see docs/photo-sources.md.
+const photos = [
+  ["wanaka/resized/full/that-wanaka-tree.webp", "photo-wanaka-tree"],
+  ["twizel/resized/full/peters-lookout.webp", "photo-pukaki"],
+  ["oamaru/resized/full/moeraki-boulders.webp", "photo-moeraki"],
+  ["twizel/resized/full/clay-cliffs-omarama.webp", "photo-clay-cliffs"],
+  ["arrowtown/resized/full/crown-range-summit-lookout.webp", "photo-crown-range"],
+  ["queenstown/resized/full/shotover-jet.webp", "photo-shotover-jet"],
+  ["kaikoura/resized/full/cathedral-cliffs-gore-bay.webp", "photo-gore-bay"],
+  ["wanaka/resized/full/diamond-lake-rocky-mountain-track.webp", "photo-diamond-lake"],
+  ["mtcook/resized/full/hooker-valley-track.webp", "photo-hooker-valley"],
+  ["carcamp-pexels-30131065.jpg", "photo-campervan"],
+];
+for (const [src, name] of photos) {
+  for (const w of [800, 1200]) {
+    await sharp(join(pics, src)).resize({ width: w, withoutEnlargement: true }).webp({ quality: 74 }).toFile(join(out, `${name}-${w}.webp`));
+  }
+}
+
+// Raw app screens (no store caption or frame), for the CSS phone frames.
+for (const s of ["map", "explore"]) {
+  for (const w of [300, 600]) {
+    await sharp(join(app, `store/screenshots/source/${s}-capture-828x1792.png`)).resize({ width: w }).webp({ quality: 80 }).toFile(join(out, `screen-${s}-${w}.webp`));
+  }
+}
 
 const shots = ["01-poster", "02-map", "03-explore", "04-place", "05-suggested-trips", "06-trip-days", "07-guide"];
 

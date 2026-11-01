@@ -31,65 +31,113 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="brand wrap">
-    <img src="/img/mark.svg" alt="" width="32" height="32">
-    <span>Kiwi Guide</span>
+  <header class="topbar wrap">
+    <span class="brand"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</span>
   </header>
 
   <main>
     <section class="hero">
-      <picture>
-        <source media="(min-width: 900px)" type="image/webp" srcset="/img/hero-21x9-1600.webp 1600w, /img/hero-21x9-2560.webp 2560w" sizes="100vw" width="2560" height="1097">
-        <img class="hero-img" src="/img/hero-3x2-800.webp" srcset="/img/hero-3x2-800.webp 800w, /img/hero-3x2-1600.webp 1600w" sizes="100vw" width="1600" height="1067" fetchpriority="high"
-          alt="A yellow kiwi road sign beside an empty road through tussock hills, with Aoraki Mount Cook behind.">
-      </picture>
       <div class="wrap hero-copy">
         <h1>Plan your South Island road trip</h1>
         <div class="hero-side">
           <p class="lead">Kiwi Guide is a free iPhone app for exploring New Zealand's South Island by road. Pick a suggested trip or build your own, day by day.</p>
-          <p class="small">Free, with no ads and no in-app purchases.</p>
           <a class="badge" href="https://apps.apple.com/app/apple-store/idTODO-APP-ID?pt=TODO-PROVIDER-TOKEN&amp;ct=website&amp;mt=8">
             <picture>
               <source srcset="/img/app-store-badge-white.svg" media="(prefers-color-scheme: dark)">
               <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54">
             </picture>
           </a>
+          <p class="small">Free, with no ads and no in-app purchases.</p>
+        </div>
+      </div>
+      <div class="hero-stage">
+        <picture>
+          <source media="(min-width: 900px)" type="image/webp" srcset="/img/hero-21x9-1600.webp 1600w, /img/hero-21x9-2560.webp 2560w" sizes="100vw" width="2560" height="1097">
+          <img class="hero-img" src="/img/hero-3x2-800.webp" srcset="/img/hero-3x2-800.webp 800w, /img/hero-3x2-1600.webp 1600w" sizes="100vw" width="1600" height="1067" fetchpriority="high"
+            alt="A yellow kiwi road sign beside an empty road through tussock hills, with Aoraki Mount Cook behind.">
+        </picture>
+        <div class="wrap hero-phone-row">
+          <div class="phone hero-phone">
+            <img src="/img/screen-map-300.webp" srcset="/img/screen-map-300.webp 300w, /img/screen-map-600.webp 600w" sizes="(min-width: 900px) 260px, 170px" width="300" height="649"
+              alt="The Kiwi Guide map around Wānaka, with places marked by type.">
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="wrap" aria-labelledby="features">
-      <h2 id="features">What's in the app</h2>
-      <ul class="features">
-        <li>
-          <h3>Over 500 places in about 40 towns</h3>
-          <p>Walks, lookouts, swims, adventures, and places to eat and stay. Browse them town by town or find them on the map.</p>
-        </li>
-        <li>
-          <h3>A page for every place</h3>
-          <p>Photos, what to expect, directions and reviews from other travellers.</p>
-        </li>
-        <li>
-          <h3>26 suggested trips</h3>
-          <p>Ready-made trips from Christchurch, Queenstown or Picton, from a day in the city to three weeks around the island.</p>
-        </li>
-        <li>
-          <h3>A day-by-day trip planner</h3>
-          <p>Add places to your trip and see each day's stops and how long you'll be driving.</p>
-        </li>
-        <li>
-          <h3>A travel guide with local knowledge</h3>
-          <p>Driving, weather, sandflies, booking ahead and staying safe, plus a guide to every region.</p>
-        </li>
-        <li>
-          <h3>A photo share card</h3>
-          <p>Put your own photo on a card with the place's name and the date, ready to post or send.</p>
-        </li>
+    <section class="wrap features-sec" aria-labelledby="features">
+      <div class="section-head">
+        <h2 id="features">Everything for the drive, in one app</h2>
+        <p>Over 500 places in about 40 towns, ready-made trips, and the local knowledge that saves a wasted afternoon.</p>
+      </div>
+      <div class="features-grid">
+        <ul class="features">
+          <li>
+            <h3>Places, town by town</h3>
+            <p>Walks, lookouts, swims, adventures, and places to eat and stay. Browse a town or find them on the map.</p>
+          </li>
+          <li>
+            <h3>A page for every place</h3>
+            <p>Photos, what to expect, directions and reviews from other travellers.</p>
+          </li>
+          <li>
+            <h3>26 suggested trips</h3>
+            <p>From a day in Christchurch to three weeks around the island, starting from Christchurch, Queenstown or Picton.</p>
+          </li>
+          <li>
+            <h3>A day-by-day trip planner</h3>
+            <p>Add places to your trip and see each day's stops and how long you'll be driving.</p>
+          </li>
+          <li>
+            <h3>A travel guide with local knowledge</h3>
+            <p>Driving, weather, sandflies, booking ahead and staying safe, plus a guide to every region.</p>
+          </li>
+          <li>
+            <h3>A photo share card</h3>
+            <p>Put your own photo on a card with the place's name and the date, ready to post or send.</p>
+          </li>
+        </ul>
+        <figure class="panel">
+          <img class="panel-photo" src="/img/photo-wanaka-tree-800.webp" srcset="/img/photo-wanaka-tree-800.webp 800w, /img/photo-wanaka-tree-1200.webp 1200w" sizes="(min-width: 900px) 520px, 100vw" width="1200" height="800" loading="lazy"
+            alt="That Wānaka Tree, a lone willow standing in Lake Wānaka with snowy mountains behind.">
+          <div class="phone panel-phone">
+            <img src="/img/screen-explore-300.webp" srcset="/img/screen-explore-300.webp 300w, /img/screen-explore-600.webp 600w" sizes="200px" width="300" height="649" loading="lazy"
+              alt="Kiwi Guide's Explore screen for Wānaka, led by That Wānaka Tree, with filters for walks, scenic spots and more.">
+          </div>
+          <figcaption>That Wānaka Tree, one of the places in Wānaka.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="wrap" aria-label="Kiwi Guide in numbers">
+      <ul class="stats">
+        <li><strong>500+</strong><span>places to explore</span></li>
+        <li><strong>40</strong><span>towns, give or take</span></li>
+        <li><strong>26</strong><span>suggested trips</span></li>
+        <li><strong>10</strong><span>regions in the guide</span></li>
       </ul>
     </section>
 
-    <section class="shots-section" aria-labelledby="screens">
-      <h2 id="screens" class="wrap">A look inside</h2>
+    <section class="places-sec" aria-labelledby="places">
+      <div class="wrap section-head">
+        <h2 id="places">Places worth the drive</h2>
+        <p>A few of the 500 or so places in the app.</p>
+      </div>
+      <ul class="places" tabindex="0" aria-label="Places in the app, scrolls sideways">
+        <li><img src="/img/photo-moeraki-800.webp" width="800" height="533" loading="lazy" alt="Large round boulders on the sand at low tide."><p><strong>Moeraki Boulders</strong> Ōamaru</p></li>
+        <li><img src="/img/photo-clay-cliffs-800.webp" width="800" height="450" loading="lazy" alt="Jagged gold clay pinnacles under a blue sky."><p><strong>Clay Cliffs Omarama</strong> Twizel</p></li>
+        <li><img src="/img/photo-shotover-jet-800.webp" width="800" height="532" loading="lazy" alt="A red jet boat full of passengers spinning through a narrow river canyon."><p><strong>Shotover Jet</strong> Queenstown</p></li>
+        <li><img src="/img/photo-gore-bay-800.webp" width="800" height="533" loading="lazy" alt="Eroded clay cliffs above a long curving beach."><p><strong>Cathedral Cliffs, Gore Bay</strong> Kaikōura</p></li>
+        <li><img src="/img/photo-diamond-lake-800.webp" width="800" height="533" loading="lazy" alt="A dark round lake ringed with bush, seen from above."><p><strong>Diamond Lake and Rocky Mountain Track</strong> Wānaka</p></li>
+        <li><img src="/img/photo-crown-range-800.webp" width="800" height="535" loading="lazy" alt="A road winding down through tussock from the Crown Range towards a lake."><p><strong>Crown Range Summit Lookout</strong> Arrowtown</p></li>
+      </ul>
+    </section>
+
+    <section class="shots-sec" aria-labelledby="screens">
+      <div class="wrap section-head">
+        <h2 id="screens">A look inside</h2>
+        <p>From the map to your trip, day by day.</p>
+      </div>
       <ul class="shots" tabindex="0" aria-label="App screenshots, scrolls sideways">
         <li><img src="/img/shot-01-poster-360.webp" srcset="/img/shot-01-poster-360.webp 360w, /img/shot-01-poster-720.webp 720w" sizes="220px" width="360" height="782" loading="lazy" alt="Kiwi Guide: places, trips and guides for a New Zealand trip."></li>
         <li><img src="/img/shot-02-map-360.webp" srcset="/img/shot-02-map-360.webp 360w, /img/shot-02-map-720.webp 720w" sizes="220px" width="360" height="782" loading="lazy" alt="Everything your trip needs, mapped: the map around Wānaka with places marked by type."></li>
@@ -101,31 +149,36 @@
       </ul>
     </section>
 
-    <section class="wrap trips" aria-labelledby="trips">
-      <div>
+    <section class="wrap trips-sec" aria-labelledby="trips">
+      <div class="section-head">
         <h2 id="trips">Suggested trips</h2>
-        <p>Not sure where to start? There are 26 suggested trips, from Christchurch in a Day to three weeks around the island. South Island in 7, 10, 14 and 21 Days each leave from Christchurch, Queenstown or Picton.</p>
-        <p>Copy one into your own trip, then add, move or drop places as you go.</p>
+        <p>Not sure where to start? There are 26 suggested trips, from Christchurch in a Day to three weeks around the island. South Island in 7, 10, 14 and 21 Days each leave from Christchurch, Queenstown or Picton. Copy one into your own trip, then add, move or drop places as you go.</p>
       </div>
-      <figure class="sign">
-        <ul aria-label="Some of the suggested trips and how long they take">
-          <li><span>Picton to Christchurch via Kaikōura</span> <span>3 days</span></li>
-          <li><span>Christchurch to Queenstown via Tekapo and Mount Cook</span> <span>4 days</span></li>
-          <li><span>Southern Scenic Route: Queenstown to Dunedin</span> <span>6 days</span></li>
-          <li><span>The Southern Loop</span> <span>10 days</span></li>
-          <li><span>Queenstown to Picton via the West Coast</span> <span>10 days</span></li>
-        </ul>
-      </figure>
+      <div class="trip-stage">
+        <img class="trip-photo" src="/img/photo-pukaki-1200.webp" srcset="/img/photo-pukaki-800.webp 800w, /img/photo-pukaki-1200.webp 1200w" sizes="(min-width: 1152px) 1120px, 100vw" width="1200" height="456" loading="lazy"
+          alt="Lake Pukaki, bright blue, with Aoraki Mount Cook and the Southern Alps beyond.">
+        <figure class="sign">
+          <ul aria-label="Some of the suggested trips and how long they take">
+            <li><span>Picton to Christchurch via Kaikōura</span> <span>3 days</span></li>
+            <li><span>Christchurch to Queenstown via Tekapo and Mount Cook</span> <span>4 days</span></li>
+            <li><span>Southern Scenic Route: Queenstown to Dunedin</span> <span>6 days</span></li>
+            <li><span>The Southern Loop</span> <span>10 days</span></li>
+            <li><span>Queenstown to Picton via the West Coast</span> <span>10 days</span></li>
+          </ul>
+        </figure>
+      </div>
     </section>
 
-    <section class="guide" aria-labelledby="guide">
+    <section class="guide-sec" aria-labelledby="guide">
       <div class="wrap">
-        <h2 id="guide">A travel guide with local knowledge</h2>
-        <p class="measure">The things that catch visitors out, in plain words: one-lane bridges, sandflies, why a drive takes longer than the map says, and what to book before you arrive.</p>
-        <div class="guide-cols">
+        <div class="section-head">
+          <h2 id="guide">A travel guide with local knowledge</h2>
+          <p>The things that catch visitors out, in plain words: one-lane bridges, sandflies, why a drive takes longer than the map says, and what to book before you arrive.</p>
+        </div>
+        <div class="guide-grid">
           <div>
             <h3>Before you go</h3>
-            <ul class="plates">
+            <ul class="topics">
               <li>Driving the South Island</li>
               <li>Weather &amp; Seasons</li>
               <li>Sun, Sandflies &amp; Water</li>
@@ -138,7 +191,7 @@
           </div>
           <div>
             <h3>Region by region</h3>
-            <p class="small">Why to come, getting around, when to come, local hazards and rules, and what to book ahead.</p>
+            <p class="guide-note">Why to come, getting around, when to come, local hazards and rules, and what to book ahead.</p>
             <ul class="plates">
               <li>Canterbury &amp; Christchurch</li>
               <li>Kaikōura</li>
@@ -153,32 +206,49 @@
             </ul>
           </div>
         </div>
+        <img class="guide-photo" src="/img/photo-hooker-valley-1200.webp" srcset="/img/photo-hooker-valley-800.webp 800w, /img/photo-hooker-valley-1200.webp 1200w" sizes="(min-width: 1152px) 1120px, 100vw" width="1200" height="675" loading="lazy"
+          alt="The Hooker Valley Track, a rocky glacial valley leading up to snowy peaks.">
       </div>
     </section>
 
-    <section class="wrap cta" aria-labelledby="get">
-      <img src="/img/favicon.svg" alt="" width="88" height="88" class="cta-icon">
-      <div>
-        <h2 id="get">Get Kiwi Guide</h2>
-        <p>Free on the App Store, for iPhone.</p>
+    <section class="wrap cta-sec" aria-labelledby="get">
+      <div class="cta">
+        <img class="cta-photo" src="/img/photo-campervan-1200.webp" srcset="/img/photo-campervan-800.webp 800w, /img/photo-campervan-1200.webp 1200w" sizes="(min-width: 1152px) 1120px, 100vw" width="1200" height="800" loading="lazy" alt="">
+        <div class="cta-copy">
+          <h2 id="get">Campervan, rental car or the family wagon: take Kiwi Guide along</h2>
+          <p>Free on the App Store, for iPhone.</p>
+          <a class="badge" href="https://apps.apple.com/app/apple-store/idTODO-APP-ID?pt=TODO-PROVIDER-TOKEN&amp;ct=website&amp;mt=8">
+            <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54">
+          </a>
+        </div>
       </div>
-      <a class="badge" href="https://apps.apple.com/app/apple-store/idTODO-APP-ID?pt=TODO-PROVIDER-TOKEN&amp;ct=website&amp;mt=8">
-        <picture>
-          <source srcset="/img/app-store-badge-white.svg" media="(prefers-color-scheme: dark)">
-          <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54">
-        </picture>
-      </a>
     </section>
   </main>
 
-  <footer class="wrap">
-    <ul class="footer-links">
-      <li><a href="https://blacksands.app/kiwi-guide#privacy">Privacy policy</a></li>
-      <li><a href="https://blacksands.app/kiwi-guide#terms">Terms of service</a></li>
-      <li><a href="mailto:info@blacksandsdigital.nz">info@blacksandsdigital.nz</a></li>
-    </ul>
-    <p>Kiwi Guide is made by Black Sands Digital. Header photo: "Road towards Mount Cook" by Jean-Pierre Brungs, CC0.</p>
-    <p>Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
+  <footer>
+    <div class="wrap">
+      <div class="footer-top">
+        <span class="brand"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</span>
+        <ul class="footer-links">
+          <li><a href="https://blacksands.app/kiwi-guide#privacy">Privacy policy</a></li>
+          <li><a href="https://blacksands.app/kiwi-guide#terms">Terms of service</a></li>
+          <li><a href="mailto:info@blacksandsdigital.nz">info@blacksandsdigital.nz</a></li>
+        </ul>
+      </div>
+      <p>Kiwi Guide is made by Black Sands Digital.</p>
+      <details class="credits">
+        <summary>Photo credits</summary>
+        <p>Header, "Road towards Mount Cook" by Jean-Pierre Brungs, CC0.
+        That Wānaka Tree by Keerti Siag photography, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>, resized.
+        Lake Pukaki from Peters Lookout by Francis Vallance (Heritage Warrior), <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a>, resized.
+        Cathedral Cliffs, Gore Bay by Michal Klajban, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>, resized.
+        Crown Range Summit Lookout by BriYYZ, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>, resized.
+        Hooker Valley Track by Bonito Coquito, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>, resized.
+        Moeraki Boulders, Clay Cliffs and Diamond Lake: public domain. Shotover Jet: CC0. Campervan: Pexels.</p>
+      </details>
+      <p>Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
+    </div>
+    <p class="wordmark" aria-hidden="true">Kiwi Guide</p>
   </footer>
 </body>
 </html>

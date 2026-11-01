@@ -21,6 +21,10 @@ Until the app is approved the site says "Coming soon to the App Store" and has n
 
 Canonical, Open Graph, `robots.txt` and `sitemap.xml` already point at `https://guide.kiwi/`.
 
+## QR code address: guide.kiwi/app
+
+Posters and stickers point at **https://guide.kiwi/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. Today it opens the home page; at launch, point it at the App Store campaign link with `ct=qr` (the file says how). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
+
 ## Privacy policy and terms
 
 `public/privacy/` and `public/terms/` were copied from https://blacksands.app/kiwi-guide on 1 Nov 2026. The app and App Store Connect still point there, so change both copies together until those links are moved here.

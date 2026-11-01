@@ -112,12 +112,22 @@ main > .hero { margin-top: 0; }
 .hero-copy { padding-block: clamp(24px, 4vw, 48px) clamp(28px, 3vw, 40px); }
 .hero-copy h1 { margin-bottom: 20px; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
-.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; }
+.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 20px; }
 .hero-cta .small { margin: 0; }
-.badge { display: inline-block; border-radius: 9px; }
-/* Apple: at least 40px high, clear space a quarter of its height */
-.badge img { height: 54px; width: auto; margin: 14px 0; }
-.hero-cta .badge img { height: 50px; margin: 13px 0; }
+/* Not a button: the app isn't in the store yet. Swap for Apple's badge at launch (see README). */
+.soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+.soon::before { content: ""; width: 9px; height: 9px; background: var(--kiwi); transform: rotate(45deg); }
+.cta-copy .soon { margin-top: 20px; background: #fff; color: #12292c; }
 .phone {
   background: #0b1416;
   padding: 7px;
@@ -335,3 +345,13 @@ footer p { margin-bottom: 0.6em; max-width: 90ch; }
   color: color-mix(in srgb, var(--line) 55%, var(--paper));
   user-select: none;
 }
+
+/* Privacy policy and terms */
+.legal { max-width: 72ch; padding-block: clamp(24px, 5vw, 64px) clamp(56px, 8vw, 96px); }
+.legal h1 { font-size: clamp(2.2rem, 5vw, 3.25rem); margin-bottom: 12px; }
+.legal h3 { font-size: 1.25rem; margin: 2em 0 0.5em; }
+.legal ul { list-style: disc; padding-left: 1.3em; }
+.legal li { margin-bottom: 0.7em; }
+.legal-contact { margin-top: 3em; padding-top: 1.5em; border-top: 1px solid var(--line); }
+footer .brand { text-decoration: none; }
+.topbar .brand { text-decoration: none; }

@@ -6,12 +6,11 @@ The owner OK'd photos from their `Pictures/southisland` folder on 1 Nov 2026, op
 
 | Used as | Photo | Source | Licence | Credit on page | Checked |
 |---|---|---|---|---|---|
-| Hero (`img/hero-*`), share image (`img/og.jpg`) | "Road towards Mount Cook", Jean-Pierre Brungs (first published on Unsplash), [file page](https://commons.wikimedia.org/wiki/File:Road_towards_Mount_Cook_(Unsplash).jpg), via the app repo's `store/header/` | Wikimedia Commons | CC0 | Courtesy credit in the footer (none required) | 30 Oct 2026, app repo `docs/photo-sources.md` |
+| Hero (`img/hero-road-*`, the plain photo), share image (`img/og.jpg`, the header art built from it) | "Road towards Mount Cook", Jean-Pierre Brungs (first published on Unsplash), [file page](https://commons.wikimedia.org/wiki/File:Road_towards_Mount_Cook_(Unsplash).jpg), via the app repo's `store/header/` | Wikimedia Commons | CC0 | Courtesy credit in the footer (none required) | 30 Oct 2026, app repo `docs/photo-sources.md` |
 | Features panel (`img/photo-wanaka-tree-*`) | That Wānaka Tree, `wanaka/resized/full/that-wanaka-tree.webp` | Wikimedia Commons | CC BY-SA 2.0 | Keerti Siag photography, CC BY-SA 2.0, resized | 1 Nov 2026 |
 | Trips (`img/photo-pukaki-*`) | Lake Pukaki from Peters Lookout, `twizel/resized/full/peters-lookout.webp` | Wikimedia Commons | CC BY 2.0 | Francis Vallance (Heritage Warrior), CC BY 2.0, resized | 1 Nov 2026 |
 | Places strip (`img/photo-gore-bay-*`) | Cathedral Cliffs, Gore Bay, `kaikoura/resized/full/cathedral-cliffs-gore-bay.webp` | Wikimedia Commons | CC BY-SA 4.0 | Michal Klajban, CC BY-SA 4.0, resized | 1 Nov 2026 |
 | Places strip (`img/photo-crown-range-*`) | Crown Range Summit Lookout, `arrowtown/resized/full/crown-range-summit-lookout.webp` | Wikimedia Commons | CC BY-SA 2.0 | BriYYZ, CC BY-SA 2.0, resized | 1 Nov 2026 |
-| Guide (`img/photo-hooker-valley-*`) | Hooker Valley Track, `mtcook/resized/full/hooker-valley-track.webp` | Wikimedia Commons | CC BY-SA 4.0 | Bonito Coquito, CC BY-SA 4.0, resized | 1 Nov 2026 |
 | Places strip (`img/photo-moeraki-*`) | Moeraki Boulders, `oamaru/resized/full/moeraki-boulders.webp` | Wikimedia Commons | Public domain | Courtesy mention in the footer | 1 Nov 2026 |
 | Places strip (`img/photo-clay-cliffs-*`) | Clay Cliffs Omarama, `twizel/resized/full/clay-cliffs-omarama.webp` | Wikimedia Commons | Public domain | Courtesy mention in the footer | 1 Nov 2026 |
 | Places strip (`img/photo-diamond-lake-*`) | Diamond Lake and Rocky Mountain Track, `wanaka/resized/full/diamond-lake-rocky-mountain-track.webp` | Wikimedia Commons | Public domain | Courtesy mention in the footer | 1 Nov 2026 |

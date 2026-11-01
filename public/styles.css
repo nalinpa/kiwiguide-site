@@ -1,5 +1,19 @@
 @font-face {
   font-family: "Overpass";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/overpass-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+2215;
+}
+@font-face {
+  font-family: "Overpass";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/overpass-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Overpass";
   font-weight: 600;
   font-display: swap;
   src: url("/fonts/overpass-latin-600-normal.woff2") format("woff2");
@@ -31,7 +45,7 @@
 :root {
   --paper: #f2f5f4;
   --ink: #12292c;
-  --muted: #4a5f61;
+  --muted: #364a4c;
   --line: #d3dddb;
   --teal: #095c65;
   --teal-deep: #06363b;
@@ -44,7 +58,7 @@
   :root {
     --paper: #0d1b1d;
     --ink: #e5eeed;
-    --muted: #a6bab9;
+    --muted: #bccdcc;
     --line: #23393b;
     --night: #071113;
     --post: #5d6a6b;
@@ -57,7 +71,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 1.0625rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 1.0625rem/1.6 "Overpass", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-text-size-adjust: 100%;
   overflow-x: clip;
 }
@@ -73,6 +87,7 @@ h1, h2, h3, .brand, .sign, .wordmark {
   font-weight: 600;
   line-height: 1.06;
   letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 /* Heavy weight kept for the road-sign voice: the sign, the brand and the numbers */
 .brand, .sign, .wordmark { font-weight: 800; letter-spacing: -0.01em; }
@@ -86,10 +101,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .small { font-size: 0.92rem; color: var(--muted); }
 main > section { margin-block: clamp(64px, 9vw, 120px); }
 .section-head { display: grid; gap: 14px; margin-bottom: clamp(28px, 4vw, 48px); }
-.section-head p { color: var(--muted); max-width: 58ch; margin: 0; font-size: 1.1rem; }
-@media (min-width: 900px) {
-  .section-head { grid-template-columns: 1.2fr 1fr; align-items: end; gap: 48px; }
-}
+.section-head p { color: var(--muted); max-width: 56ch; margin: 0; font-size: 1.15rem; }
 
 /* Top bar */
 .topbar { padding-block: 18px; }
@@ -97,7 +109,7 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 
 /* Hero: one column of words, then the app standing in the road photo */
 main > .hero { margin-top: 0; }
-.hero-copy { padding-block: clamp(32px, 6vw, 80px) clamp(36px, 4vw, 52px); }
+.hero-copy { padding-block: clamp(24px, 4vw, 48px) clamp(28px, 3vw, 40px); }
 .hero-copy h1 { margin-bottom: 20px; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
 .hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; }
@@ -117,20 +129,20 @@ main > .hero { margin-top: 0; }
   position: relative;
   overflow: hidden;
   border-radius: 28px;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   box-shadow: 0 50px 120px -50px rgba(9, 92, 101, 0.75);
 }
-.stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
-/* Phones either side of the kiwi sign, whole and readable */
-.stage-phone { position: absolute; bottom: 5.5%; width: 25%; max-width: 280px; }
-.stage-left { left: 8%; }
-.stage-right { right: 8%; }
+.stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+/* Two phones, whole and readable, either side of the mountain */
+.stage-phone { position: absolute; bottom: 5%; width: 24%; max-width: 270px; }
+.stage-left { left: 14%; }
+.stage-right { right: 14%; }
 @media (max-width: 899px) {
   .stage { aspect-ratio: auto; height: 460px; border-radius: 20px; }
-  /* Crop moved so the sign sits left of the one phone */
-  .stage-photo { object-position: 78% 40%; }
+  .stage { height: 440px; }
+  .stage-photo { object-position: 45% 30%; }
   .stage-left { display: none; }
-  .stage-right { right: 16px; bottom: 20px; width: clamp(120px, 38vw, 160px); }
+  .stage-right { right: 50%; transform: translateX(50%); bottom: 20px; width: clamp(150px, 46vw, 190px); }
 }
 
 /* Features: open a row to see its screen (native details, no script).
@@ -176,12 +188,13 @@ main > .hero { margin-top: 0; }
 .sc-brand { bottom: 14px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
 
 @media (min-width: 900px) {
-  .features-grid { grid-template-columns: 1fr 1fr; gap: 64px; min-height: 640px; }
-  .panel { display: block; position: relative; margin: 0; border-radius: 24px; overflow: hidden; background: var(--teal); }
+  .features-grid { grid-template-columns: 1fr 1fr; gap: 64px; align-items: stretch; }
+  .features { align-self: center; }
+  .panel { display: block; min-height: 460px; position: relative; margin: 0; border-radius: 24px; overflow: hidden; background: var(--teal); }
   .panel-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .panel::after { content: ""; position: absolute; inset: 0; background: rgba(6, 30, 33, 0.25); }
   /* Centre of the right-hand column */
-  .feat-visual { position: absolute; z-index: 2; top: 50%; left: calc(100% - (100% - 64px) / 4); transform: translate(-50%, -50%); width: 250px; margin: 0; }
+  .feat-visual { position: absolute; z-index: 2; top: 50%; left: calc(100% - (100% - 64px) / 4); transform: translate(-50%, -50%); width: 190px; margin: 0; }
   .sharecard { width: 320px; transform: translate(-50%, -50%) rotate(-3deg); }
 }
 
@@ -214,7 +227,8 @@ main > .shots-sec {
 
 /* Numbers band */
 .stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
-.stats li { padding: 24px 0 8px; border-bottom: 1px solid var(--line); }
+.stats li { padding: 24px 20px 8px; border-bottom: 1px solid var(--line); }
+.stats li:nth-child(even) { border-left: 1px solid var(--line); }
 .stats strong {
   display: block;
   font-family: "Overpass", system-ui, sans-serif;
@@ -228,13 +242,13 @@ main > .shots-sec {
 @media (prefers-color-scheme: dark) { .stats strong { color: var(--kiwi); } }
 @media (min-width: 900px) {
   .stats { grid-template-columns: repeat(4, 1fr); }
-  .stats li + li { padding-left: 28px; border-left: 1px solid var(--line); }
+  .stats li + li { border-left: 1px solid var(--line); }
 }
 
 /* Suggested trips: the sign stands in front of Lake Pukaki */
 .trip-stage { position: relative; }
-.trip-photo { width: 100%; border-radius: 24px; aspect-ratio: 1200 / 456; object-fit: cover; }
-.sign { margin: -48px 12px 0; position: relative; padding-bottom: 56px; }
+.trip-photo { width: 100%; border-radius: 24px; aspect-ratio: 4 / 3; object-fit: cover; }
+.sign { margin: -40px 12px 0; position: relative; }
 .sign ul {
   position: relative;
   z-index: 1;
@@ -249,7 +263,7 @@ main > .shots-sec {
 .sign li + li { border-top: 2px solid rgba(255, 255, 255, 0.28); }
 .sign li span:last-child { color: var(--kiwi); white-space: nowrap; }
 .sign::before, .sign::after {
-  content: "";
+  content: none;
   position: absolute;
   bottom: 0;
   height: 80px;
@@ -261,6 +275,7 @@ main > .shots-sec {
 .sign::after { right: 22%; }
 @media (min-width: 900px) {
   .trip-photo { aspect-ratio: auto; min-height: 460px; }
+  .sign::before, .sign::after { content: ""; }
   .sign { position: absolute; right: 5%; bottom: 0; width: min(54%, 560px); margin: 0; padding-bottom: 72px; }
   .sign::before, .sign::after { height: 110px; }
 }
@@ -284,19 +299,21 @@ main > .guide-sec {
 .guide-sec .section-head p, .guide-note { color: #cfe3e2; }
 .guide-grid { display: grid; gap: 48px; }
 .guide-sec h3 { margin-bottom: 14px; }
-.topics { border-top: 1px solid rgba(255, 255, 255, 0.25); }
-.topics li { padding-block: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.25); font-size: 1.08rem; }
+/* A plain list: these are the guide's contents, not links */
+.topics { columns: 2 22ch; column-gap: 24px; }
+.topics li { position: relative; padding: 0 0 12px 18px; break-inside: avoid; font-size: 1.05rem; }
+.topics li::before { content: ""; position: absolute; left: 0; top: 0.55em; width: 7px; height: 7px; background: var(--kiwi); transform: rotate(45deg); }
 .plates { display: flex; flex-wrap: wrap; gap: 10px; }
-.plates li { padding: 6px 14px; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 8px; font-size: 0.98rem; }
-.guide-photo { margin-top: 48px; border-radius: 20px; width: 100%; aspect-ratio: 21 / 8; object-fit: cover; }
+.plates li { padding: 5px 12px; background: rgba(255, 255, 255, 0.12); border-radius: 8px; font-size: 0.98rem; }
 @media (min-width: 900px) { .guide-grid { grid-template-columns: 1fr 1fr; gap: 72px; } }
 
 /* Final download: the campervan */
-.cta { position: relative; border-radius: 28px; overflow: hidden; min-height: 520px; display: flex; align-items: flex-end; background: var(--teal-deep); }
+.cta { position: relative; border-radius: 28px; overflow: hidden; min-height: 520px; display: flex; align-items: center; background: var(--teal-deep); }
 .cta-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%; }
-.cta::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(0deg, rgba(4, 22, 25, 0.94) 0%, rgba(4, 22, 25, 0.78) 45%, rgba(4, 22, 25, 0.2) 80%, transparent 100%); }
+.cta::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(4, 22, 25, 0.82) 0%, rgba(4, 22, 25, 0.55) 38%, transparent 62%); }
+@media (max-width: 719px) { .cta::before { background: linear-gradient(0deg, rgba(4, 22, 25, 0.85) 0%, rgba(4, 22, 25, 0.5) 50%, transparent 75%); } }
 .cta-copy { position: relative; z-index: 2; padding: clamp(24px, 5vw, 56px); color: #fff; }
-.cta-copy h2 { max-width: 18ch; }
+.cta-copy h2 { max-width: 14ch; }
 .cta-copy p { margin: 12px 0 0; color: #dce9e8; }
 
 /* Footer */
@@ -305,15 +322,16 @@ footer { padding-top: 40px; font-size: 0.9rem; color: var(--muted); border-top: 
 .footer-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 footer p { margin-bottom: 0.6em; max-width: 90ch; }
 .credits { margin-bottom: 0.6em; }
-.credits summary { cursor: pointer; color: var(--ink); width: max-content; }
+.credits summary { cursor: pointer; color: var(--ink); width: max-content; list-style: none; text-decoration: underline; text-underline-offset: 0.2em; }
+.credits summary::-webkit-details-marker { display: none; }
 .credits summary:focus-visible { outline: 3px solid var(--kiwi); outline-offset: 4px; border-radius: 4px; }
 .credits p { margin-top: 0.6em; line-height: 1.55; }
 .wordmark {
-  margin: 32px 0 0;
+  margin: 72px 0 0;
   text-align: center;
   white-space: nowrap;
   font-size: 19vw;
   line-height: 0.75;
-  color: var(--line);
+  color: color-mix(in srgb, var(--line) 55%, var(--paper));
   user-select: none;
 }

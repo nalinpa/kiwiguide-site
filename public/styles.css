@@ -107,9 +107,9 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 .topbar { padding-block: 18px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
 
-/* Hero: one column of words, then the app standing in the road photo */
-main > .hero { margin-top: 0; }
-.hero-copy { padding-block: clamp(24px, 4vw, 48px) clamp(28px, 3vw, 40px); }
+/* Hero: words, then the road photo with the app in it. From tablet width up they sit side by side. */
+main > .hero { margin-top: 0; display: grid; }
+.hero-copy { padding-block: 24px 28px; }
 .hero-copy h1 { margin-bottom: 20px; }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
 .hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 20px; }
@@ -138,21 +138,24 @@ main > .hero { margin-top: 0; }
 .stage {
   position: relative;
   overflow: hidden;
-  border-radius: 28px;
-  aspect-ratio: 16 / 9;
+  height: 440px;
+  border-radius: 20px;
   box-shadow: 0 50px 120px -50px rgba(9, 92, 101, 0.75);
 }
-.stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
-/* Two phones, whole and readable, either side of the mountain */
-.stage-phone { position: absolute; bottom: 5%; width: 24%; max-width: 270px; }
-.stage-left { left: 14%; }
-.stage-right { right: 14%; }
-@media (max-width: 899px) {
-  .stage { aspect-ratio: auto; height: 460px; border-radius: 20px; }
-  .stage { height: 440px; }
-  .stage-photo { object-position: 45% 30%; }
-  .stage-left { display: none; }
-  .stage-right { right: 50%; transform: translateX(50%); bottom: 20px; width: clamp(150px, 46vw, 190px); }
+.stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% 30%; }
+.stage-phone { position: absolute; max-width: 280px; }
+.stage-left { display: none; }
+.stage-right { right: 50%; transform: translateX(50%); bottom: 20px; width: clamp(150px, 46vw, 190px); }
+@media (min-width: 768px) {
+  main > .hero { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(32px, 4.5vw, 64px); padding-top: clamp(8px, 2vw, 24px); }
+  .hero-copy { padding: 0; }
+  .hero-copy h1 { font-size: clamp(2.6rem, 5.2vw, 4.4rem); }
+  .stage { height: auto; aspect-ratio: 4 / 5; max-height: 760px; border-radius: 28px; }
+  .stage-photo { object-position: 50% 30%; }
+  /* Two screens, staggered and slightly tilted, the map in front */
+  .stage-left, .stage-right { display: block; width: 41%; }
+  .stage-left { left: 6%; top: 7%; transform: rotate(-5deg); }
+  .stage-right { right: 6%; bottom: 6%; transform: rotate(3deg); }
 }
 
 /* Features: open a row to see its screen (native details, no script).

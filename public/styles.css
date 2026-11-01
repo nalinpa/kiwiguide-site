@@ -225,7 +225,11 @@ main > .hero { margin-top: 0; display: grid; }
 .places img { aspect-ratio: 4 / 5; object-fit: cover; border-radius: 16px; }
 .places p { margin: 10px 2px 0; color: var(--muted); font-size: 0.95rem; line-height: 1.4; }
 .places strong { display: block; color: var(--ink); font-size: 1rem; }
-@media (min-width: 1240px) { .places li { flex: 0 0 calc((1120px - 2 * 16px) / 3.4); } }
+/* Wider screens: a grid, nothing to scroll sideways with a mouse */
+@media (min-width: 768px) {
+  .places { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px 20px; overflow: visible; width: min(100% - 32px, 1120px); margin-inline: auto; padding: 0; }
+  .places img { aspect-ratio: 4 / 3; }
+}
 
 /* Screenshots: dark band */
 main > .shots-sec {
@@ -238,6 +242,11 @@ main > .shots-sec {
 .shots-sec .section-head p { color: #a6bab9; }
 .shots li { flex: 0 0 min(64vw, 280px); scroll-snap-align: start; }
 .shots img { border-radius: 18px; }
+/* Two centred rows (4 then 3), in the App Store order */
+@media (min-width: 1024px) {
+  .shots { flex-wrap: wrap; justify-content: center; gap: 28px 24px; overflow: visible; width: min(100% - 32px, 1120px); margin-inline: auto; padding: 0; }
+  .shots li { flex: 0 0 calc((100% - 3 * 24px) / 4); max-width: 250px; }
+}
 
 /* Numbers band */
 .stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }

@@ -68,43 +68,60 @@
     <section class="wrap features-sec" aria-labelledby="features">
       <div class="section-head">
         <h2 id="features">Everything for the drive, in one app</h2>
-        <p>Over 500 places in about 40 towns, ready-made trips, and the local knowledge that saves a wasted afternoon.</p>
+        <p>Find places, plan the days, and know what you're in for before you get there.</p>
       </div>
       <div class="features-grid">
-        <ul class="features">
-          <li>
-            <h3>Places, town by town</h3>
-            <p>Walks, lookouts, swims, adventures, and places to eat and stay. Browse a town or find them on the map.</p>
-          </li>
-          <li>
-            <h3>A page for every place</h3>
-            <p>Photos, what to expect, directions and reviews from other travellers.</p>
-          </li>
-          <li>
-            <h3>26 suggested trips</h3>
-            <p>From a day in Christchurch to three weeks around the island, starting from Christchurch, Queenstown or Picton.</p>
-          </li>
-          <li>
-            <h3>A day-by-day trip planner</h3>
-            <p>Add places to your trip and see each day's stops and how long you'll be driving.</p>
-          </li>
-          <li>
-            <h3>A travel guide with local knowledge</h3>
-            <p>Driving, weather, sandflies, booking ahead and staying safe, plus a guide to every region.</p>
-          </li>
-          <li>
-            <h3>A photo share card</h3>
-            <p>Put your own photo on a card with the place's name and the date, ready to post or send.</p>
-          </li>
-        </ul>
-        <figure class="panel">
-          <img class="panel-photo" src="/img/photo-wanaka-tree-800.webp" srcset="/img/photo-wanaka-tree-800.webp 800w, /img/photo-wanaka-tree-1200.webp 1200w" sizes="(min-width: 900px) 520px, 100vw" width="1200" height="800" loading="lazy"
-            alt="That Wānaka Tree, a lone willow standing in Lake Wānaka with snowy mountains behind.">
-          <div class="phone panel-phone">
-            <img src="/img/screen-explore-300.webp" srcset="/img/screen-explore-300.webp 300w, /img/screen-explore-600.webp 600w" sizes="200px" width="300" height="649" loading="lazy"
-              alt="Kiwi Guide's Explore screen for Wānaka, led by That Wānaka Tree, with filters for walks, scenic spots and more.">
-          </div>
-          <figcaption>That Wānaka Tree, one of the places in Wānaka.</figcaption>
+        <div class="features">
+          <details name="feature" open>
+            <summary><h3>Places, town by town</h3></summary>
+            <div class="feat-body">
+              <p>Walks, lookouts, swims, adventures, and places to eat and stay. Browse a town or find them on the map.</p>
+              <div class="phone feat-visual"><img src="/img/screen-explore-300.webp" srcset="/img/screen-explore-300.webp 300w, /img/screen-explore-600.webp 600w" sizes="240px" width="300" height="649" loading="lazy" alt="The Explore screen for Wānaka, led by That Wānaka Tree, with filters for walks, scenic spots and more."></div>
+            </div>
+          </details>
+          <details name="feature">
+            <summary><h3>A page for every place</h3></summary>
+            <div class="feat-body">
+              <p>Photos, what to expect, directions and reviews from other travellers.</p>
+              <div class="phone feat-visual"><img src="/img/screen-place-300.webp" srcset="/img/screen-place-300.webp 300w, /img/screen-place-600.webp 600w" sizes="240px" width="300" height="649" loading="lazy" alt="The Key Summit Track page, with a photo, directions, reviews and Add to Trip."></div>
+            </div>
+          </details>
+          <details name="feature">
+            <summary><h3>Suggested trips</h3></summary>
+            <div class="feat-body">
+              <p>From a day in Christchurch to three weeks around the island, starting from Christchurch, Queenstown or Picton.</p>
+              <div class="phone feat-visual"><img src="/img/screen-suggested-trips-300.webp" srcset="/img/screen-suggested-trips-300.webp 300w, /img/screen-suggested-trips-600.webp 600w" sizes="240px" width="300" height="649" loading="lazy" alt="A new trip from Christchurch, with South Island in 7, 10, 14 and 21 Days to choose from."></div>
+            </div>
+          </details>
+          <details name="feature">
+            <summary><h3>A day-by-day trip planner</h3></summary>
+            <div class="feat-body">
+              <p>Add places to your trip and see each day's stops and how long you'll be driving.</p>
+              <div class="phone feat-visual"><img src="/img/screen-trip-days-300.webp" srcset="/img/screen-trip-days-300.webp 300w, /img/screen-trip-days-600.webp 600w" sizes="240px" width="300" height="649" loading="lazy" alt="A trip's days, from Haast to Wānaka through to the Catlins, each with its places and driving time."></div>
+            </div>
+          </details>
+          <details name="feature">
+            <summary><h3>A travel guide with local knowledge</h3></summary>
+            <div class="feat-body">
+              <p>Driving, weather, sandflies, booking ahead and staying safe, plus a guide to every region.</p>
+              <div class="phone feat-visual"><img src="/img/screen-guide-300.webp" srcset="/img/screen-guide-300.webp 300w, /img/screen-guide-600.webp 600w" sizes="240px" width="300" height="649" loading="lazy" alt="The guide's South Island topics, from driving to emergencies and outdoor safety."></div>
+            </div>
+          </details>
+          <details name="feature">
+            <summary><h3>A photo share card</h3></summary>
+            <div class="feat-body">
+              <p>Put your own photo on a card with the place's name and the date, ready to post or send.</p>
+              <div class="feat-visual sharecard" role="img" aria-label="An example share card: a photo of That Wānaka Tree with the place's name and Kiwi Guide on it.">
+                <img src="/img/photo-wanaka-tree-800.webp" width="800" height="533" loading="lazy" alt="">
+                <span class="sc-top">South Island</span>
+                <span class="sc-name">That Wānaka Tree</span>
+                <span class="sc-brand"><img src="/img/mark.svg" alt="" width="20" height="20"> Kiwi Guide</span>
+              </div>
+            </div>
+          </details>
+        </div>
+        <figure class="panel" aria-hidden="true">
+          <img class="panel-photo" src="/img/photo-wanaka-tree-800.webp" srcset="/img/photo-wanaka-tree-800.webp 800w, /img/photo-wanaka-tree-1200.webp 1200w" sizes="560px" width="1200" height="800" loading="lazy" alt="">
         </figure>
       </div>
     </section>
@@ -120,8 +137,8 @@
 
     <section class="places-sec" aria-labelledby="places">
       <div class="wrap section-head">
-        <h2 id="places">Places worth the drive</h2>
-        <p>A few of the 500 or so places in the app.</p>
+        <h2 id="places">Stops you'll find in the app</h2>
+        <p>A few favourites, from the Kaikōura coast to the Mackenzie.</p>
       </div>
       <ul class="places" tabindex="0" aria-label="Places in the app, scrolls sideways">
         <li><img src="/img/photo-moeraki-800.webp" width="800" height="533" loading="lazy" alt="Large round boulders on the sand at low tide."><p><strong>Moeraki Boulders</strong> Ōamaru</p></li>
@@ -166,6 +183,19 @@
             <li><span>Queenstown to Picton via the West Coast</span> <span>10 days</span></li>
           </ul>
         </figure>
+      </div>
+      <div class="day">
+        <div>
+          <h3>What a day looks like</h3>
+          <p>Day 2 of Christchurch to Queenstown via Tekapo and Mount Cook. Every stop is timed around opening hours and the drive between.</p>
+        </div>
+        <ol class="day-list">
+          <li><time>9:00 am</time> Church of the Good Shepherd</li>
+          <li><time>10:00 am</time> Mt John Summit and Astro Café</li>
+          <li><time>12:30 pm</time> Peters Lookout</li>
+          <li><time>2:00 pm</time> Kea Point Track</li>
+          <li><time>5:30 pm</time> Tasman Glacier View and Blue Lakes</li>
+        </ol>
       </div>
     </section>
 

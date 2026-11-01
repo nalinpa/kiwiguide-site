@@ -29,7 +29,7 @@ for (const [src, name] of photos) {
 }
 
 // Raw app screens (no store caption or frame), for the CSS phone frames.
-for (const s of ["map", "explore"]) {
+for (const s of ["map", "explore", "place", "suggested-trips", "trip-days", "guide"]) {
   for (const w of [300, 600]) {
     await sharp(join(app, `store/screenshots/source/${s}-capture-828x1792.png`)).resize({ width: w }).webp({ quality: 80 }).toFile(join(out, `screen-${s}-${w}.webp`));
   }

@@ -38,9 +38,8 @@ for (const s of ["map", "explore", "place", "suggested-trips", "trip-days", "gui
 const shots = ["01-poster", "02-map", "03-explore", "04-place", "05-suggested-trips", "06-trip-days", "07-guide"];
 
 const jobs = [
-  // Phones get the 3:2 crop, wider screens the 21:9 one.
+  // The hero photo (3:2), shown in a rounded frame at every width.
   ...[800, 1600].map((w) => ["store/header/kiwi-guide-search-3x2-3840x2560.png", `hero-3x2-${w}.webp`, w]),
-  ...[1600, 2560].map((w) => ["store/header/kiwi-guide-header-21x9-3840x1646.png", `hero-21x9-${w}.webp`, w]),
   ...shots.flatMap((s) => [360, 720].map((w) => [`store/screenshots/kiwi-guide-${s}.png`, `shot-${s}-${w}.webp`, w])),
 ];
 

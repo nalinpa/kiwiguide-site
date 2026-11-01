@@ -1,5 +1,19 @@
 @font-face {
   font-family: "Overpass";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/overpass-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+2215;
+}
+@font-face {
+  font-family: "Overpass";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/overpass-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Overpass";
   font-weight: 800;
   font-display: swap;
   src: url("/fonts/overpass-latin-800-normal.woff2") format("woff2");
@@ -56,12 +70,14 @@ a:focus-visible, [tabindex]:focus-visible {
 }
 h1, h2, h3, .brand, .sign, .wordmark {
   font-family: "Overpass", system-ui, sans-serif;
-  font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
 }
-h1 { font-size: clamp(2.6rem, 7.4vw, 5rem); margin: 0; max-width: 11ch; }
-h2 { font-size: clamp(1.8rem, 4.6vw, 3rem); margin: 0; max-width: 22ch; }
+/* Heavy weight kept for the road-sign voice: the sign, the brand and the numbers */
+.brand, .sign, .wordmark { font-weight: 800; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.5rem, 6vw, 4.25rem); margin: 0; max-width: 14ch; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.75rem); margin: 0; max-width: 22ch; }
 h3 { font-size: 1.15rem; margin: 0 0 0.3em; }
 p { margin: 0 0 1em; }
 ul { list-style: none; margin: 0; padding: 0; }
@@ -79,19 +95,17 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 .topbar { padding-block: 18px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
 
-/* Hero: words first, then the road with the app on it */
+/* Hero: one column of words, then the app standing in the road photo */
 main > .hero { margin-top: 0; }
-.hero-copy { display: grid; gap: 22px; padding-block: clamp(24px, 6vw, 72px) clamp(32px, 5vw, 56px); }
-.lead { font-size: clamp(1.15rem, 2vw, 1.3rem); max-width: 36ch; margin-bottom: 18px; }
+.hero-copy { padding-block: clamp(32px, 6vw, 80px) clamp(36px, 4vw, 52px); }
+.hero-copy h1 { margin-bottom: 20px; }
+.lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
+.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; }
+.hero-cta .small { margin: 0; }
 .badge { display: inline-block; border-radius: 9px; }
 /* Apple: at least 40px high, clear space a quarter of its height */
 .badge img { height: 54px; width: auto; margin: 14px 0; }
-@media (min-width: 900px) {
-  .hero-copy { grid-template-columns: 1.25fr 1fr; align-items: end; gap: 56px; }
-}
-.hero-stage { position: relative; }
-.hero-img { width: 100%; max-height: 78vh; object-fit: cover; object-position: 50% 45%; }
-.hero-phone-row { position: relative; height: 0; }
+.hero-cta .badge img { height: 50px; margin: 13px 0; }
 .phone {
   background: #0b1416;
   padding: 7px;
@@ -99,18 +113,24 @@ main > .hero { margin-top: 0; }
   box-shadow: 0 24px 60px -18px rgba(6, 30, 33, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 .phone img { border-radius: 23px; }
-/* The whole phone sits inside the photo: at most about 80% of its height */
-.hero-stage { overflow: hidden; }
-.hero-phone {
-  position: absolute;
-  right: 0;
-  bottom: 28px;
-  width: min(15vw, 240px);
+.stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  aspect-ratio: 16 / 10;
+  box-shadow: 0 50px 120px -50px rgba(9, 92, 101, 0.75);
 }
+.stage-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
+/* Phones either side of the kiwi sign, whole and readable */
+.stage-phone { position: absolute; bottom: 5.5%; width: 25%; max-width: 280px; }
+.stage-left { left: 8%; }
+.stage-right { right: 8%; }
 @media (max-width: 899px) {
-  /* Crop shifted so the sign sits left of the phone */
-  .hero-img { height: 380px; max-height: none; object-position: 62% 45%; }
-  .hero-phone { width: 116px; bottom: 20px; right: 0; }
+  .stage { aspect-ratio: auto; height: 460px; border-radius: 20px; }
+  /* Crop moved so the sign sits left of the one phone */
+  .stage-photo { object-position: 78% 40%; }
+  .stage-left { display: none; }
+  .stage-right { right: 16px; bottom: 20px; width: clamp(120px, 38vw, 160px); }
 }
 
 /* Features: open a row to see its screen (native details, no script).

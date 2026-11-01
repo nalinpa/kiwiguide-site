@@ -27,8 +27,8 @@
 
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
-  <link rel="preload" href="/fonts/overpass-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="preload" href="/fonts/overpass-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css?v=4">
 </head>
 <body>
   <header class="topbar wrap">
@@ -39,26 +39,27 @@
     <section class="hero">
       <div class="wrap hero-copy">
         <h1>Plan your South Island road trip</h1>
-        <div class="hero-side">
-          <p class="lead">Kiwi Guide is a free iPhone app for exploring New Zealand's South Island by road. Pick a suggested trip or build your own, day by day.</p>
+        <p class="lead">Kiwi Guide is a free iPhone app for exploring New Zealand's South Island by road. Pick a suggested trip or build your own, day by day.</p>
+        <div class="hero-cta">
           <a class="badge" href="https://apps.apple.com/app/apple-store/idTODO-APP-ID?pt=TODO-PROVIDER-TOKEN&amp;ct=website&amp;mt=8">
             <picture>
               <source srcset="/img/app-store-badge-white.svg" media="(prefers-color-scheme: dark)">
-              <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54">
+              <img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="150" height="50">
             </picture>
           </a>
-          <p class="small">Free, with no ads and no in-app purchases.</p>
+          <p class="small">Free. No ads, no in-app purchases.</p>
         </div>
       </div>
-      <div class="hero-stage">
-        <picture>
-          <source media="(min-width: 900px)" type="image/webp" srcset="/img/hero-21x9-1600.webp 1600w, /img/hero-21x9-2560.webp 2560w" sizes="100vw" width="2560" height="1097">
-          <img class="hero-img" src="/img/hero-3x2-800.webp" srcset="/img/hero-3x2-800.webp 800w, /img/hero-3x2-1600.webp 1600w" sizes="100vw" width="1600" height="1067" fetchpriority="high"
+      <div class="wrap">
+        <div class="stage">
+          <img class="stage-photo" src="/img/hero-3x2-1600.webp" srcset="/img/hero-3x2-800.webp 800w, /img/hero-3x2-1600.webp 1600w" sizes="(min-width: 1152px) 1120px, 100vw" width="1600" height="1067" fetchpriority="high"
             alt="A yellow kiwi road sign beside an empty road through tussock hills, with Aoraki Mount Cook behind.">
-        </picture>
-        <div class="wrap hero-phone-row">
-          <div class="phone hero-phone">
-            <img src="/img/screen-map-300.webp" srcset="/img/screen-map-300.webp 300w, /img/screen-map-600.webp 600w" sizes="(min-width: 900px) 260px, 170px" width="300" height="649"
+          <div class="phone stage-phone stage-left">
+            <img src="/img/screen-trip-days-300.webp" srcset="/img/screen-trip-days-300.webp 300w, /img/screen-trip-days-600.webp 600w" sizes="280px" width="300" height="649"
+              alt="A trip in Kiwi Guide, day by day, from Haast to Wānaka through to the Catlins, with each day's places and driving time.">
+          </div>
+          <div class="phone stage-phone stage-right">
+            <img src="/img/screen-map-300.webp" srcset="/img/screen-map-300.webp 300w, /img/screen-map-600.webp 600w" sizes="(min-width: 900px) 280px, 160px" width="300" height="649"
               alt="The Kiwi Guide map around Wānaka, with places marked by type.">
           </div>
         </div>

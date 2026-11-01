@@ -1,0 +1,6 @@
+// Static site only: Cloudflare serves ./public as is, no Worker code.
+{
+  "name": "kiwiguide",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./public" }
+}

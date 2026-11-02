@@ -16,6 +16,29 @@ Kiwi Guide is live: app id **6818057796**. The badges (hero and closing band), t
 
 Posters and stickers point at **https://guide.kiwi/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. It opens Kiwi Guide on the App Store (`ct=qr`). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
 
+## Campaign links: /go/<name>
+
+Each campaign (post, ad, flyer, email) gets a short link such as https://kiwiguide.blacksands.app/go/insta-nov that redirects to a chosen page and records the click. Apple's `ct=` report only counts App Store visits; these count every click, wherever the link goes.
+
+- **Add a campaign:** one line in `src/campaigns.js` (lowercase name, destination, a comment saying what it's for), then `npx wrangler deploy`. A destination starting with `/` is a page on this site. App Store links get `ct=<name>` set automatically so Apple's report lines up with ours.
+- Links forgive capitals and a trailing slash. Unknown names go to the home page and are logged as unknown, so typos in printed links show up.
+- `src/worker.js` runs only for `/go/*` (`run_worker_first` in `wrangler.jsonc`); everything else, `_redirects` included, is served from `public/` as before. Test locally with `npx wrangler dev` after `npx wrangler d1 migrations apply kiwiguide-clicks --local`. Checks: `node --test`.
+- Clicks go to the D1 database `kiwiguide-clicks`, table `clicks`: time, campaign, known, country, referring host, device type and a bot flag (link-preview fetchers like facebookexternalhit, Slackbot and WhatsApp open every link pasted into a chat, so they're marked, not dropped). No IP address, user agent or cookies are stored.
+
+Clicks per campaign over the last 30 days, bots left out:
+
+    npx wrangler d1 execute kiwiguide-clicks --remote --command "SELECT campaign, COUNT(*) AS clicks FROM clicks WHERE known = 1 AND bot = 0 AND at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-30 days') GROUP BY campaign ORDER BY clicks DESC"
+
+Unknown names (typos) over the same 30 days:
+
+    npx wrangler d1 execute kiwiguide-clicks --remote --command "SELECT campaign, COUNT(*) AS clicks FROM clicks WHERE known = 0 AND bot = 0 AND at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-30 days') GROUP BY campaign ORDER BY clicks DESC"
+
+One campaign's clicks per day (UTC):
+
+    npx wrangler d1 execute kiwiguide-clicks --remote --command "SELECT substr(at, 1, 10) AS day, COUNT(*) AS clicks FROM clicks WHERE campaign = 'insta-nov' AND bot = 0 GROUP BY day ORDER BY day"
+
+Installs per campaign are Apple's to count: App Store Connect, Analytics, Acquisition, Campaigns. They only show once `pt=` is on the App Store links (see "Still to add" above).
+
 ## Privacy policy and terms
 
 `public/privacy/` and `public/terms/` were copied from https://blacksands.app/kiwi-guide on 1 Nov 2026. The app and App Store Connect still point there, so change both copies together until those links are moved here.

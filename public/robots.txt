@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://guide.kiwi/sitemap.xml
+Sitemap: https://kiwiguide.blacksands.app/sitemap.xml

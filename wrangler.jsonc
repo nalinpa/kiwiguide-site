@@ -1,12 +1,15 @@
 // Static site only: Cloudflare serves ./public as is, no Worker code.
-// The custom domains need guide.kiwi to be an active zone on this Cloudflare account;
-// on deploy, Cloudflare creates their DNS records and HTTPS certificates itself.
+// Custom domains need their zone on this Cloudflare account; on deploy, Cloudflare
+// creates the DNS records and HTTPS certificates itself.
 {
   "name": "kiwiguide",
   "compatibility_date": "2026-10-01",
   "assets": { "directory": "./public" },
   "routes": [
-    { "pattern": "guide.kiwi", "custom_domain": true },
-    { "pattern": "www.guide.kiwi", "custom_domain": true }
+    // Temporary home while guide.kiwi is being registered.
+    { "pattern": "kiwiguide.blacksands.app", "custom_domain": true }
+    // Once guide.kiwi is an active zone, add these and switch the site's URLs back (see README):
+    // { "pattern": "guide.kiwi", "custom_domain": true },
+    // { "pattern": "www.guide.kiwi", "custom_domain": true }
   ]
 }

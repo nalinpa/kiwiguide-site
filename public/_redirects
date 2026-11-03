@@ -1,8 +1,8 @@
 # guide.kiwi/app is printed in the QR codes on posters and stickers: never rename or remove it.
 # 302 (temporary) so phones don't remember the target if it changes.
 # The extra spellings catch people typing the address off a poster (phones capitalise, people add a slash).
-# ct=qr tags QR installs; add &pt=<provider token> to each line so App Store Connect can report them.
-/app   https://apps.apple.com/app/apple-store/id6818057796?ct=qr&mt=8  302
-/app/  https://apps.apple.com/app/apple-store/id6818057796?ct=qr&mt=8  302
-/App   https://apps.apple.com/app/apple-store/id6818057796?ct=qr&mt=8  302
-/APP   https://apps.apple.com/app/apple-store/id6818057796?ct=qr&mt=8  302
+# ct=qr tags QR installs; pt= is the provider token App Store Connect needs to report them.
+/app   https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&ct=qr&mt=8  302
+/app/  https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&ct=qr&mt=8  302
+/App   https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&ct=qr&mt=8  302
+/APP   https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&ct=qr&mt=8  302

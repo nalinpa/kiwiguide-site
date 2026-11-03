@@ -7,7 +7,7 @@ A static site for the Kiwi Guide iPhone app: the home page plus `/privacy/` and 
 Kiwi Guide is live: app id **6818057796**. The badges (hero and closing band), the footer link and the Smart App Banner use it.
 
 - Site links carry `ct=website`, the QR redirect `ct=qr`, so App Store Connect can split installs by source.
-- **Still to add:** the provider token (App Store Connect, Analytics, Acquisition, Campaigns, "Generate a campaign link"). Add `&pt=<token>` to every `apps.apple.com/app/apple-store/id6818057796` link in `public/index.html` and `public/_redirects`. Without it the links work but the campaigns aren't reported.
+- Every App Store link carries the provider token `pt=128674950` (App Store Connect, Analytics, Acquisition, Campaigns), which App Store Connect needs to report the campaigns. Keep it on any new App Store link.
 - The badge is Apple's official black badge, unchanged; keep it at least 40px high with clear space a quarter of its height.
 
 **For now the site lives at https://kiwiguide.blacksands.app/** while guide.kiwi is registered. Canonical, Open Graph, `robots.txt` and `sitemap.xml` point there. To move to guide.kiwi: replace `https://kiwiguide.blacksands.app` with `https://guide.kiwi` across `public/`, uncomment the guide.kiwi routes in `wrangler.jsonc`, and deploy. Keep the blacksands.app route a while so old links still work.

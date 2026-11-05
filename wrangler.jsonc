@@ -11,10 +11,9 @@
     { "binding": "DB", "database_name": "kiwiguide-clicks", "database_id": "8e919eff-fa80-4560-b848-0d70665a7eaf" }
   ],
   "routes": [
-    // Temporary home while guide.kiwi is being registered.
+    { "pattern": "kiwiguide.app", "custom_domain": true },
+    { "pattern": "www.kiwiguide.app", "custom_domain": true },
+    // The first home: keep it so links already shared still work.
     { "pattern": "kiwiguide.blacksands.app", "custom_domain": true }
-    // Once guide.kiwi is an active zone, add these and switch the site's URLs back (see README):
-    // { "pattern": "guide.kiwi", "custom_domain": true },
-    // { "pattern": "www.guide.kiwi", "custom_domain": true }
   ]
 }

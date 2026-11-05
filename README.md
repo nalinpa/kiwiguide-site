@@ -10,11 +10,11 @@ Kiwi Guide is live: app id **6818057796**. The badges (hero and closing band), t
 - Every App Store link carries the provider token `pt=128674950` (App Store Connect, Analytics, Acquisition, Campaigns), which App Store Connect needs to report the campaigns. Keep it on any new App Store link.
 - The badge is Apple's official black badge, unchanged; keep it at least 40px high with clear space a quarter of its height.
 
-**For now the site lives at https://kiwiguide.blacksands.app/** while guide.kiwi is registered. Canonical, Open Graph, `robots.txt` and `sitemap.xml` point there. To move to guide.kiwi: replace `https://kiwiguide.blacksands.app` with `https://guide.kiwi` across `public/`, uncomment the guide.kiwi routes in `wrangler.jsonc`, and deploy. Keep the blacksands.app route a while so old links still work.
+**The site lives at https://kiwiguide.app/** (registered at Porkbun, DNS on Cloudflare). Canonical, Open Graph, `robots.txt` and `sitemap.xml` point there. www.kiwiguide.app and the first home, kiwiguide.blacksands.app, serve the same site so earlier links keep working.
 
-## QR code address: guide.kiwi/app
+## QR code address: kiwiguide.app/app
 
-Posters and stickers point at **https://guide.kiwi/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. It opens Kiwi Guide on the App Store (`ct=qr`). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
+Posters and stickers point at **https://kiwiguide.app/app**. It's a redirect set in `public/_redirects`, so where it goes can change without reprinting anything. Never rename or remove it. It opens Kiwi Guide on the App Store (`ct=qr`). Test locally with `npx wrangler dev` (Python's server ignores `_redirects`).
 
 ## Campaign links: /go/<name>
 
@@ -60,11 +60,4 @@ Only use photos recorded in `docs/photo-sources.md`.
 
     npx wrangler deploy
 
-The first deploy creates the `kiwiguide` Worker and attaches guide.kiwi and www.guide.kiwi (set in `wrangler.jsonc`). That only works once guide.kiwi is an **active** zone on the Cloudflare account:
-
-1. Cloudflare dashboard, Add a domain: `guide.kiwi` (Free plan). Cloudflare gives you two nameservers.
-2. At the registrar, set guide.kiwi's nameservers to those two. Wait for Cloudflare to show the zone as Active (minutes to a day).
-3. Remove any old A, AAAA or CNAME records for `guide.kiwi` and `www` in Cloudflare DNS, or the custom domains can't be created.
-4. `npx wrangler deploy`. Cloudflare creates the DNS records and HTTPS certificates. Check https://guide.kiwi/ loads.
-
-www.guide.kiwi serves the same page; the canonical tag points search engines at https://guide.kiwi/. A redirect from www can be added later as a Cloudflare Redirect Rule.
+The Worker serves kiwiguide.app, www.kiwiguide.app and kiwiguide.blacksands.app (custom domains in `wrangler.jsonc`). A custom domain only attaches once its zone is **active** on this Cloudflare account; Cloudflare then creates the DNS records and HTTPS certificates itself.

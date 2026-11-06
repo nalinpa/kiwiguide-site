@@ -3,4 +3,6 @@
 // A destination starting with / is a page on this site. App Store links get ct=<name> added automatically.
 export default {
   test: "/", // checks the link works; goes to the home page
+  poster: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // QR code on the new posters
+  card: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // QR code on the cards
 };

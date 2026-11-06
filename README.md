@@ -18,7 +18,7 @@ Posters and stickers point at **https://kiwiguide.app/app**. It's a redirect set
 
 ## Campaign links: /go/<name>
 
-Each campaign (post, ad, flyer, email) gets a short link such as https://kiwiguide.blacksands.app/go/insta-nov that redirects to a chosen page and records the click. Apple's `ct=` report only counts App Store visits; these count every click, wherever the link goes.
+Each campaign (post, ad, flyer, email) gets a short link such as https://kiwiguide.app/go/insta-nov that redirects to a chosen page and records the click. Apple's `ct=` report only counts App Store visits; these count every click, wherever the link goes.
 
 - **Add a campaign:** one line in `src/campaigns.js` (lowercase name, destination, a comment saying what it's for), then `npx wrangler deploy`. A destination starting with `/` is a page on this site. App Store links get `ct=<name>` set automatically so Apple's report lines up with ours.
 - Links forgive capitals and a trailing slash. Unknown names go to the home page and are logged as unknown, so typos in printed links show up.
@@ -37,7 +37,7 @@ One campaign's clicks per day (UTC):
 
     npx wrangler d1 execute kiwiguide-clicks --remote --command "SELECT substr(at, 1, 10) AS day, COUNT(*) AS clicks FROM clicks WHERE campaign = 'insta-nov' AND bot = 0 GROUP BY day ORDER BY day"
 
-Installs per campaign are Apple's to count: App Store Connect, Analytics, Acquisition, Campaigns. They only show once `pt=` is on the App Store links (see "Still to add" above).
+Installs per campaign are Apple's to count: App Store Connect, Analytics, Acquisition, Campaigns. They need `pt=` on the App Store links (it's on all of them).
 
 ## Privacy policy and terms
 

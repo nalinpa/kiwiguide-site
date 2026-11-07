@@ -6,4 +6,5 @@ export default {
   poster: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // QR code on the new posters
   card: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // QR code on the cards
   "reddit-nov": "/", // Reddit posts, November 2026; home page since much of Reddit is read on computers
+  "reddit-nov-app": "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // Reddit, November 2026, straight to the App Store
 };

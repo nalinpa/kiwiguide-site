@@ -7,4 +7,5 @@ export default {
   card: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // QR code on the cards
   "reddit-nov": "/", // Reddit posts, November 2026; home page since much of Reddit is read on computers
   "reddit-nov-app": "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // Reddit, November 2026, straight to the App Store
+  rings: "https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&mt=8", // Lord of the Rings fans: the Rings app and the LOTR blog posts, straight to the App Store
 };

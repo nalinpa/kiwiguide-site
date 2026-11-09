@@ -51,7 +51,6 @@
   --teal-deep: #06363b;
   --night: #0f2224;
   --kiwi: #ffc20e;
-  --post: #9aa5a6;
   --bar: #ffffff;
   --shade: rgba(6, 30, 33, 0.13);
   --shade-deep: rgba(4, 22, 25, 0.45);
@@ -64,7 +63,6 @@
     --muted: #bccdcc;
     --line: #23393b;
     --night: #071113;
-    --post: #5d6a6b;
     --bar: #071113;
     --shade: rgba(0, 0, 0, 0.55);
     --shade-deep: rgba(0, 0, 0, 0.7);
@@ -83,25 +81,25 @@ body {
 }
 img { max-width: 100%; height: auto; display: block; }
 a { color: inherit; text-underline-offset: 0.2em; }
-a:focus-visible, [tabindex]:focus-visible {
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid var(--kiwi);
   outline-offset: 4px;
   border-radius: 6px;
 }
-h1, h2, h3, .brand, .sign, .wordmark {
+h1, h2, h3, .brand, .wordmark {
   font-family: "Overpass", system-ui, sans-serif;
   font-weight: 600;
   line-height: 1.06;
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
-/* Heavy weight kept for the road-sign voice: the sign, the brand and the numbers */
-.brand, .sign, .wordmark { font-weight: 800; letter-spacing: -0.01em; }
+/* Heavy weight kept for the road-sign voice: the brand and the numbers */
+.brand, .wordmark { font-weight: 800; letter-spacing: -0.01em; }
 h1 { font-size: clamp(2.5rem, 6vw, 4.25rem); margin: 0; max-width: 14ch; }
 h2 { font-size: clamp(1.8rem, 4vw, 2.75rem); margin: 0; max-width: 22ch; }
 h3 { font-size: 1.15rem; margin: 0 0 0.3em; }
 /* The middle step between section headings and body text */
-.day h3, .guide-sec h3 { font-size: clamp(1.3rem, 2.2vw, 1.6rem); margin-bottom: 14px; }
+.guide-sec h3 { font-size: clamp(1.3rem, 2.2vw, 1.6rem); margin-bottom: 14px; }
 p { margin: 0 0 1em; }
 ul { list-style: none; margin: 0; padding: 0; }
 
@@ -120,8 +118,8 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 /* Top bar */
 /* The logo bar: its own colour, apart from the teal hero below it */
 /* Shadows only where the background colour changes */
-.topbar { position: relative; z-index: 2; background: var(--bar); color: var(--ink); box-shadow: 0 10px 24px -12px var(--shade-deep); }
-.topbar .wrap { padding-block: 16px; }
+.topbar { position: relative; z-index: 10; background: var(--bar); color: var(--ink); box-shadow: 0 10px 24px -12px var(--shade-deep); }
+.topbar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 16px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.2rem; }
 
 /* Hero: words, then the road photo with the app in it. From tablet width up they sit side by side. */
@@ -136,6 +134,15 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.25rem); color: var(--muted); max-width: 46ch; margin-bottom: 8px; }
 .hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; margin-top: 12px; }
 .hero-cta .small { margin: 0; }
+.free { color: var(--kiwi); }
+/* Starting towns under the badge */
+.start { margin-top: 12px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.2); }
+.start .small { margin-bottom: 12px; }
+.pills { display: flex; flex-wrap: wrap; gap: 10px; }
+/* Pills: the starting towns, the trips filter and the header button */
+.pill { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-weight: 600; line-height: 1; text-decoration: none; cursor: pointer; }
+.masthead .pill { border-color: rgba(255, 255, 255, 0.45); }
+.pill:hover, .pill:active, .pill[aria-pressed="true"], .get-app { background: var(--kiwi); border-color: var(--kiwi); color: #000; }
 /* Apple's badge, unchanged: at least 40px high, clear space a quarter of its height */
 .badge { display: inline-block; border-radius: 9px; }
 .badge img { height: 54px; width: auto; margin: 14px 0; }
@@ -170,61 +177,22 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
   .stage-phone { width: 56%; max-width: 340px; bottom: 5%; }
 }
 
-/* Features: open a row to see its screen (native details, no script).
-   Phones show the screen inside the row; wide screens move it onto the photo panel. */
-.features-grid { display: grid; gap: 48px; position: relative; }
-.features { border-top: 1px solid var(--line); }
-.features details { border-bottom: 1px solid var(--line); }
-.features summary {
-  display: grid;
-  grid-template-columns: 22px 1fr 20px;
-  align-items: center;
-  column-gap: 14px;
-  padding-block: 20px;
-  cursor: pointer;
-  list-style: none;
-}
-.features summary::-webkit-details-marker { display: none; }
-.features summary::before {
+/* Features and suggested trips: cards, one column on phones, three on wide screens */
+.cards { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.feature-cards li { padding: 28px; border-radius: 16px; background: var(--night); border: 1px solid rgba(255, 255, 255, 0.1); color: #e5eeed; }
+.feature-cards h3 { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; font-size: 1.25rem; }
+.feature-cards h3::before {
   content: "";
+  flex: none;
   width: 12px;
   height: 12px;
-  margin-left: 4px;
+  margin-left: 2px;
   background: var(--kiwi);
   border: 2px solid var(--ink);
   border-radius: 2px;
   transform: rotate(45deg);
 }
-.features summary::after { content: "+"; font-size: 1.5rem; line-height: 1; color: var(--muted); text-align: center; }
-.features details[open] summary::after { content: "\2212"; }
-.features summary h3 { margin: 0; font-size: 1.25rem; }
-.features summary:focus-visible { outline: 3px solid var(--kiwi); outline-offset: 2px; border-radius: 6px; }
-.feat-body { padding: 0 0 22px 36px; }
-.feat-body p { color: var(--muted); margin: 0; max-width: 46ch; }
-.feat-visual { width: 210px; margin: 20px auto 4px; }
-.panel { display: none; }
-
-.sharecard { position: relative; aspect-ratio: 4 / 5; border-radius: 18px; overflow: hidden; color: #fff; box-shadow: 0 24px 60px -18px rgba(6, 30, 33, 0.55); }
-.sharecard > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.sharecard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(18, 41, 44, 0.85), transparent 55%); }
-.sharecard span { position: absolute; z-index: 1; left: 16px; right: 16px; }
-.sc-top { top: 14px; font-size: 0.8rem; font-weight: 600; }
-.sc-name { bottom: 44px; font-family: "Overpass", system-ui, sans-serif; font-weight: 800; font-size: 1.4rem; line-height: 1.1; }
-.sc-brand { bottom: 14px; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
-
-/* Side by side from tablet width */
-@media (min-width: 768px) {
-  .features-grid { grid-template-columns: 1fr 1fr; gap: 48px; align-items: stretch; }
-  .features { align-self: center; }
-  .panel { display: block; min-height: 660px; position: relative; margin: 0; border-radius: 24px; overflow: hidden; background: var(--teal); }
-  .panel-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .panel::after { content: ""; position: absolute; inset: 0; background: rgba(6, 30, 33, 0.25); }
-  /* Centre of the right-hand column */
-  .feat-visual { position: absolute; z-index: 2; top: 50%; left: calc(100% - (100% - 48px) / 4); transform: translate(-50%, -50%); width: 235px; margin: 0; }
-  /* The whole phone, centred, as big as the panel allows */
-  .feat-visual.phone { width: 270px; }
-  .sharecard { width: min(34vw, 320px); transform: translate(-50%, -50%) rotate(-3deg); }
-}
+.feature-cards p { margin: 0; color: #a6bab9; }
 
 /* Places strip */
 .places, .shots {
@@ -291,57 +259,33 @@ main > .shots-sec {
   .stats li + li { border-left: 1px solid var(--line); }
 }
 
-/* Suggested trips: the sign stands in front of Lake Pukaki */
-.trip-stage { position: relative; }
-.trip-photo { width: 100%; border-radius: 24px; aspect-ratio: 4 / 3; object-fit: cover; }
-.sign { margin: -40px 12px 0; position: relative; }
-.sign ul {
-  position: relative;
-  z-index: 1;
-  background: var(--teal);
-  color: #fff;
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 4px var(--teal), inset 0 0 0 7px #fff, 0 22px 40px -20px rgba(0, 0, 0, 0.6);
-  padding: 20px 26px;
-  font-size: clamp(1.02rem, 3vw, 1.3rem);
-}
-.sign li { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding-block: 9px; }
-.sign li + li { border-top: 2px solid rgba(255, 255, 255, 0.28); }
-.sign li span:first-child { font-weight: 600; }
-.sign li span:last-child { color: var(--kiwi); white-space: nowrap; }
-.sign::before, .sign::after {
-  content: none;
-  position: absolute;
-  bottom: 0;
-  height: 80px;
-  width: 12px;
-  background: linear-gradient(90deg, var(--post), #c9d0d1 45%, var(--post));
-  border-radius: 2px;
-}
-.sign::before { left: 22%; }
-.sign::after { right: 22%; }
-@media (min-width: 768px) {
-  .trip-photo { aspect-ratio: auto; min-height: 460px; }
-  .sign::before, .sign::after { content: ""; }
-  .sign { position: absolute; right: 4%; bottom: 0; width: min(58%, 560px); margin: 0; padding-bottom: 72px; }
-  .sign::before, .sign::after { height: 110px; }
-}
+/* Suggested trips: filter by starting town, the cards, then Lake Pukaki */
+.trip-filter { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.trip-filter[hidden] { display: none; }
+.trip-cards li { padding: 24px; border-radius: 16px; border: 1px solid var(--line); }
+.trip-days { display: inline-block; margin-bottom: 14px; padding: 4px 12px; border-radius: 999px; background: var(--kiwi); color: #000; font-weight: 600; font-size: 0.9rem; }
+.trip-cards h3 { font-size: 1.2rem; }
+.trip-cards p { margin: 0; color: var(--muted); }
+.trip-photo { width: 100%; margin-top: clamp(40px, 6vw, 64px); border-radius: 24px; aspect-ratio: 4 / 3; object-fit: cover; }
+@media (min-width: 768px) { .trip-photo { aspect-ratio: auto; min-height: 460px; } }
 
-/* A sample day from a suggested trip */
-.day { display: grid; gap: 24px; margin-top: clamp(40px, 6vw, 64px); }
+/* A sample day from a suggested trip: words and a badge on the left, the timed stops on a card on the right */
+.day-sec { background: var(--paper); color: var(--ink); }
+.day { display: grid; gap: 32px; }
+.day h2 { margin-bottom: 14px; }
 .day p { color: var(--muted); max-width: 44ch; }
+.day-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; }
+.day-cta p { margin: 0; max-width: 26ch; }
+.day-card { background: var(--bar); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
 .day-list { list-style: none; margin: 0; padding: 0; border-left: 3px solid var(--teal); }
 .day-list li { position: relative; display: grid; grid-template-columns: 6.5em 1fr; gap: 12px; padding: 12px 0 12px 22px; }
-.day-list li::before { content: ""; position: absolute; left: -8px; top: 1.15em; width: 13px; height: 13px; border-radius: 50%; background: var(--paper); border: 3px solid var(--teal); }
-.day-list time { font-variant-numeric: tabular-nums; color: var(--muted); }
-@media (prefers-color-scheme: dark) { .day-list, .day-list li::before { border-color: var(--kiwi); } }
-@media (min-width: 768px) {
-  .day { gap: 28px; }
-  .day-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; border-left: 0; border-top: 3px solid var(--teal); }
-  .day-list li { display: block; padding: 24px 0 0; }
-  .day-list li::before { left: 0; top: -8px; }
-  .day-list time { display: block; margin-bottom: 4px; }
+.day-list li::before { content: ""; position: absolute; left: -8px; top: 1.15em; width: 13px; height: 13px; border-radius: 50%; background: var(--bar); border: 3px solid var(--teal); }
+.day-list time { font-variant-numeric: tabular-nums; color: var(--teal); }
+@media (prefers-color-scheme: dark) {
+  .day-list, .day-list li::before { border-color: var(--kiwi); }
+  .day-list time { color: var(--kiwi); }
 }
+@media (min-width: 768px) { .day { grid-template-columns: 1fr 1fr; align-items: center; gap: 64px; } }
 
 /* Guide */
 main > .guide-sec {
@@ -420,4 +364,10 @@ footer .brand { text-decoration: none; }
   .topbar .wrap { padding-block: 20px; }
   .topbar .brand { font-size: 1.6rem; gap: 14px; }
   .topbar .brand img { width: 44px; height: 44px; }
+}
+/* Desktop: the home page bar stays in view so "Get the app" does too. Phones get Apple's install bar instead
+   (from 1024px so iPhones held sideways, up to 932px, don't lose a slice of screen). */
+@media (min-width: 1024px) {
+  .topbar:has(.get-app) { position: sticky; top: 0; }
+  html { scroll-padding-top: 100px; }
 }

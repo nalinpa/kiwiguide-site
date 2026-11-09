@@ -1,6 +1,6 @@
 # Kiwi Guide website
 
-A static site for the Kiwi Guide iPhone app: the home page plus `/privacy/` and `/terms/`. Plain HTML and CSS with no build step. Everything served lives in `public/`.
+A static site for the Kiwi Guide iPhone app: the home page plus `/privacy/` and `/terms/`. Plain HTML and CSS with no build step, plus one small script for the suggested trips filter (`public/trips.js`, allowed by `script-src 'self'` in `public/_headers`; the page works without it). Everything served lives in `public/`.
 
 ## App Store links
 

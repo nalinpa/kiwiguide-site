@@ -142,7 +142,10 @@ main > section { margin-block: clamp(64px, 9vw, 120px); }
 /* Pills: the starting towns, the trips filter and the header button */
 .pill { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-weight: 600; line-height: 1; text-decoration: none; cursor: pointer; }
 .masthead .pill { border-color: rgba(255, 255, 255, 0.45); }
-.pill:hover, .pill:active, .pill[aria-pressed="true"], .get-app { background: var(--kiwi); border-color: var(--kiwi); color: #000; }
+.pill:hover, .pill:active, .pill[aria-pressed="true"] { background: var(--kiwi); border-color: var(--kiwi); color: #000; }
+/* The header button: white, yellow on hover like the other pills */
+.get-app { background: #fff; border-color: var(--line); color: #000; }
+.get-app:hover, .get-app:active { background: var(--kiwi); border-color: var(--kiwi); }
 /* Apple's badge, unchanged: at least 40px high, clear space a quarter of its height */
 .badge { display: inline-block; border-radius: 9px; }
 .badge img { height: 54px; width: auto; margin: 14px 0; }

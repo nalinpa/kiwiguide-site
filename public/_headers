@@ -8,3 +8,9 @@
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+# iOS reads this to let Kiwi Guide save and fill passwords for kiwiguide.app. No file
+# extension, so it needs its type set here.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600

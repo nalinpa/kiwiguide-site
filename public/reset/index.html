@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#095C65">
   <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css?v=21">
+  <link rel="stylesheet" href="/styles.css?v=24">
 </head>
 <body>
   <header class="topbar">
@@ -18,7 +18,8 @@
   <main class="wrap legal reset">
     <h1>Reset your password</h1>
     <p id="email" class="small"></p>
-    <p id="loading">Checking your link…</p>
+    <noscript><p>This page needs JavaScript to change your password. Turn it on and reload, or open Kiwi Guide and ask for a new link.</p></noscript>
+    <p id="loading" hidden>Checking your link…</p>
     <form id="form" hidden>
       <label for="password">New password</label>
       <input id="password" type="password" autocomplete="new-password" minlength="6" required>

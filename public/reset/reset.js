@@ -21,8 +21,10 @@ if (typeof module !== "undefined") module.exports = { readLink, messageFor };
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   const link = readLink(location.search);
-  // The code is only needed in memory; take it out of the address bar and history.
-  history.replaceState(null, "", location.pathname);
+  // The code is only needed in memory; once the result is definitive, take it out of the
+  // address bar and history. After a network error it stays, so a reload retries the link.
+  const strip = () => history.replaceState(null, "", location.pathname);
+  $("loading").hidden = false; // hidden in the HTML so a visitor without JS sees only the noscript note
 
   const say = (text) => { $("msg").textContent = text; };
   const call = async (body) => {
@@ -37,14 +39,20 @@ if (typeof document !== "undefined") {
   const stop = (text) => { $("form").hidden = true; $("loading").hidden = true; say(text); };
 
   if (!link || link.mode !== "resetPassword") {
+    strip();
     stop(EXPIRED);
   } else {
     call({ oobCode: link.oobCode }).then((d) => {
+      strip();
       $("loading").hidden = true;
       $("email").textContent = "for " + d.email;
       $("form").hidden = false;
       $("password").focus();
-    }).catch((e) => stop(messageFor(e instanceof TypeError ? "" : e.message)));
+    }).catch((e) => {
+      const text = messageFor(e instanceof TypeError ? "" : e.message);
+      if (text === EXPIRED) strip();
+      stop(text);
+    });
 
     $("form").addEventListener("submit", async (ev) => {
       ev.preventDefault(); // form-action is 'none': never really submit
@@ -53,6 +61,7 @@ if (typeof document !== "undefined") {
       say("");
       try {
         await call({ oobCode: link.oobCode, newPassword: $("password").value });
+        $("password").value = "";
         stop("Password changed. Open Kiwi Guide and sign in with your new password.");
         $("open").hidden = false;
       } catch (e) {

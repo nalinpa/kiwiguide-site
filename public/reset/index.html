@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset your password | Kiwi Guide</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#095C65">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css?v=21">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap"><a class="brand" href="/"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</a></div>
+  </header>
+
+  <main class="wrap legal reset">
+    <h1>Reset your password</h1>
+    <p id="email" class="small"></p>
+    <p id="loading">Checking your link…</p>
+    <form id="form" hidden>
+      <label for="password">New password</label>
+      <input id="password" type="password" autocomplete="new-password" minlength="6" required>
+      <button id="go" class="pill" type="submit">Change Password</button>
+    </form>
+    <p id="msg" class="reset-msg" aria-live="polite"></p>
+    <a id="open" class="pill" href="southislandguide://" hidden>Open Kiwi Guide</a>
+  </main>
+
+  <footer>
+    <div class="wrap footer-top">
+      <a class="brand" href="/"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</a>
+      <ul class="footer-links">
+        <li><a href="/privacy/">Privacy policy</a></li>
+        <li><a href="/terms/">Terms of service</a></li>
+        <li><a href="mailto:info@blacksandsdigital.nz">info@blacksandsdigital.nz</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="/reset/reset.js"></script>
+</body>
+</html>

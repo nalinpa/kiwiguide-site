@@ -374,3 +374,13 @@ footer .brand { text-decoration: none; }
   .topbar:has(.get-app) { position: sticky; top: 0; }
   html { scroll-padding-top: 100px; }
 }
+
+/* Password reset page */
+.reset form { display: grid; gap: 12px; max-width: 24rem; margin-top: 24px; }
+.reset label { font-weight: 600; }
+.reset input { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: inherit; font: inherit; }
+.reset input:focus-visible { outline: 3px solid var(--kiwi); outline-offset: 2px; }
+.reset button.pill { justify-content: center; background: var(--kiwi); border-color: var(--kiwi); color: #000; }
+.reset button.pill:disabled { opacity: 0.6; cursor: default; }
+.reset-msg { margin-top: 16px; font-weight: 600; }
+.reset [hidden] { display: none; }

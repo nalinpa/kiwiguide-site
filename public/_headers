@@ -14,3 +14,10 @@
 /.well-known/apple-app-site-association
   Content-Type: application/json
   Cache-Control: public, max-age=3600
+
+# The password reset page calls Firebase's Identity Toolkit, so its policy adds connect-src.
+# Cloudflare merges rules, so the site-wide policy is detached first (it must come after /*).
+/reset/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src https://identitytoolkit.googleapis.com
+  X-Robots-Tag: noindex

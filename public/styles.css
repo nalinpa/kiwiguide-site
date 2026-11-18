@@ -232,14 +232,20 @@ main > .shots-sec {
 .shots-poster img { border-radius: 18px; }
 @media (min-width: 768px) and (max-width: 1023px) { .shots-intro { width: min(100% - 64px, 1120px); } }
 .shots img { border-radius: 18px; }
-/* Two centred rows (4 then 3), in the App Store order */
+.ipad-block { margin-top: clamp(48px, 8vw, 96px); }
+.ipad-block .section-head { width: min(100% - 32px, 1120px); margin-inline: auto; }
+.ipad-shots li { flex-basis: min(84vw, 480px); }
+@media (min-width: 768px) and (max-width: 1023px) { .ipad-block .section-head { width: min(100% - 64px, 1120px); } }
 @media (min-width: 1024px) {
-  /* Heading and poster on the left, the six app screens three to a row on the right (same order) */
+  /* Heading and poster on the left, the seven app screens four to a row on the right (App Store order) */
   .shots-layout { display: grid; grid-template-columns: 240px 1fr; gap: 48px; width: min(100% - 64px, 1120px); margin-inline: auto; }
   .shots-intro { width: auto; margin: 0; }
   .shots-poster { display: block; }
-  .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 24px; overflow: visible; padding: 0; }
+  .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px 24px; overflow: visible; padding: 0; }
   .shots-first { display: none; }
+  .ipad-block { width: min(100% - 64px, 1120px); margin-inline: auto; }
+  .ipad-block .section-head { width: auto; }
+  .ipad-shots { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* Numbers band */

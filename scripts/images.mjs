@@ -30,16 +30,18 @@ for (const [src, name] of photos) {
 // Raw app screens (no store caption or frame), for the CSS phone frames.
 for (const s of ["map", "explore", "place", "suggested-trips", "trip-days", "guide"]) {
   for (const w of [300, 600]) {
-    await sharp(join(app, `store/screenshots/source/${s}-capture-828x1792.png`)).resize({ width: w }).webp({ quality: 80 }).toFile(join(out, `screen-${s}-${w}.webp`));
+    await sharp(join(app, `store/screenshots/source/${s}-capture-1320x2868.png`)).resize({ width: w }).webp({ quality: 80 }).toFile(join(out, `screen-${s}-${w}.webp`));
   }
 }
 
-const shots = ["01-poster", "02-map", "03-explore", "04-place", "05-suggested-trips", "06-trip-days", "07-guide"];
+const shots = ["01-poster", "02-trip-days", "03-trip-hours", "04-suggested-trips", "05-map", "06-explore", "07-place", "08-guide"];
+const ipad = ["02-trip", "04-map", "05-explore"];
 
 const jobs = [
   // The hero: the header art's CC0 source photo, without the sign (its text repeated the headline).
   ...[800, 1600, 2400].map((w) => ["store/header/source/road-towards-mount-cook-5184x2916.jpg", `hero-road-${w}.webp`, w]),
   ...shots.flatMap((s) => [360, 720].map((w) => [`store/screenshots/kiwi-guide-${s}.png`, `shot-${s}-${w}.webp`, w])),
+  ...ipad.flatMap((s) => [600, 1200].map((w) => [`store/screenshots/ipad/kiwi-guide-ipad-${s}.png`, `ipad-${s}-${w}.webp`, w])),
 ];
 
 for (const [src, dest, width] of jobs) {

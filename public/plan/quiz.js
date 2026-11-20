@@ -147,13 +147,41 @@ function startDateFor(answer, today) {
   return iso(m.year, m.month, 1);
 }
 
+// Coming back to a finished deck keeps the swipes: the last card shows again, and its yes (if any) is taken back.
+function reopenDeck(idx, liked) {
+  if (idx < CARDS.length) return { idx: idx, liked: liked };
+  var last = CARDS[CARDS.length - 1].siteId, at = liked.lastIndexOf(last);
+  return { idx: CARDS.length - 1, liked: at < 0 ? liked.slice() : liked.slice(0, at).concat(liked.slice(at + 1)) };
+}
+
+// Drops any saved answer that no longer fits the data, and every answer after it.
+function cleanState(saved, trips, today) {
+  var out = { start: null, band: null, idx: 0, liked: [], season: null, month: null, pick: null };
+  if (!saved || typeof saved !== "object") return out;
+  var towns = {}; trips.forEach(function (t) { towns[t.start] = true; });
+  if (typeof saved.start !== "string" || !towns[saved.start]) return out;
+  out.start = saved.start;
+  if (!bandsFor(trips, out.start).some(function (b) { return b.id === saved.band; })) return out;
+  out.band = saved.band;
+  var ids = CARDS.map(function (c) { return c.siteId; });
+  if (!Array.isArray(saved.liked) || !saved.liked.every(function (i) { return ids.indexOf(i) >= 0; }) || !(saved.idx >= 0 && saved.idx <= CARDS.length && saved.idx % 1 === 0)) return out;
+  out.idx = saved.idx; out.liked = saved.liked.slice();
+  if (saved.season !== "unsure" && !SEASONS.some(function (x) { return x.id === saved.season; })) return out;
+  out.season = saved.season;
+  var m = saved.month;
+  if (m && saved.season !== "unsure" && monthsOf(saved.season, today).some(function (x) { return x.month === m.month && x.year === m.year; })) out.month = { month: m.month, year: m.year };
+  else if (m) return out;
+  if (tripsFor(trips, out.start, out.band).some(function (t) { return t.key === saved.pick; })) out.pick = saved.pick;
+  return out;
+}
+
 function stepFromHash(hash) {
   var n = parseInt(String(hash).replace("#", ""), 10);
   return n >= 0 && n <= 6 ? n : 0;
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash };
+  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, cleanState: cleanState };
 }
 
 // ---- the page ----
@@ -171,7 +199,7 @@ if (typeof document !== "undefined") (function () {
 
   function blank() { return { start: null, band: null, idx: 0, liked: [], season: null, month: null, pick: null }; }
   var st = blank();
-  try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = Object.assign(blank(), saved); } catch (e) { /* works without it */ }
+  try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = saved; } catch (e) { /* works without it */ }
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -283,7 +311,7 @@ if (typeof document !== "undefined") (function () {
     var step = stepFromHash(location.hash);
     var ok = lowestValid(step);
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
-    if (step === 2 && ok === 2 && st.idx >= CARDS.length) { st.idx = 0; st.liked = []; save(); }
+    if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
     root.innerHTML = screens[step]();
     bar.style.width = PROGRESS[step] + "%";
@@ -370,8 +398,13 @@ if (typeof document !== "undefined") (function () {
 
   fetch("/plan/trips.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
     trips = d.trips;
-    render();
-  }).catch(function () {
+    st = cleanState(st, trips, new Date());
+    save();
+  }).then(function () {
+    try { render(); } catch (e) {
+      root.innerHTML = '<h1>Something went wrong</h1><p>The quiz hit a problem. Reload the page, or <a href="/#trips">see the suggested trips</a>.</p>';
+    }
+  }, function () {
     root.innerHTML = '<h1>Something went wrong</h1><p>The trips would not load. Try again, or <a href="/#trips">see the suggested trips</a>.</p>';
   });
 })();

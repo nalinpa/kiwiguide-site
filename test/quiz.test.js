@@ -75,3 +75,26 @@ test("stepFromHash", () => {
   assert.equal(stepFromHash("#x"), 0);
   assert.equal(stepFromHash("#99"), 0);
 });
+
+test("reopenDeck: a finished deck shows the last card again, taking back its yes", () => {
+  const last = CARDS[7].siteId;
+  assert.deepEqual(Q.reopenDeck(8, ["hooker-valley-track", last]), { idx: 7, liked: ["hooker-valley-track"] });
+  assert.deepEqual(Q.reopenDeck(8, ["hooker-valley-track"]), { idx: 7, liked: ["hooker-valley-track"] });
+  assert.deepEqual(Q.reopenDeck(3, ["shotover-jet"]), { idx: 3, liked: ["shotover-jet"] });
+});
+
+test("cleanState: bad answers are dropped with everything after them; a good state passes", () => {
+  const key = tripsFor(trips, "queenstown", "weekend")[0].key;
+  const good = { start: "queenstown", band: "weekend", idx: 8, liked: ["shotover-jet"], season: "summer", month: { month: 0, year: 2027 }, pick: key };
+  assert.deepEqual(Q.cleanState(good, trips, NOV20), good);
+  assert.equal(Q.cleanState({ ...good, start: "mars" }, trips, NOV20).start, null);
+  const b = Q.cleanState({ ...good, pick: "nope" }, trips, NOV20);
+  assert.equal(b.pick, null); assert.equal(b.season, "summer");
+  const c = Q.cleanState({ ...good, band: "short" }, trips, NOV20); // Queenstown has a 2-day trip, so "short" is valid
+  assert.equal(c.band, "short"); assert.equal(c.pick, null);
+  const d = Q.cleanState({ ...good, season: "monsoon" }, trips, NOV20);
+  assert.equal(d.season, null); assert.equal(d.pick, null); assert.equal(d.band, "weekend");
+  assert.equal(Q.cleanState({ ...good, month: { month: 5, year: 2027 } }, trips, NOV20).month, null);
+  assert.equal(Q.cleanState("junk", trips, NOV20).start, null);
+  assert.equal(Q.cleanState({ ...good, liked: ["x"] }, trips, NOV20).band, "weekend");
+});

@@ -14,9 +14,15 @@ function consentDefaults() {
   return [denied, granted];
 }
 
+function isTestHost(loc) { return !!loc && GA_HOSTS.indexOf(loc.hostname) < 0; }
+
 // No-op when the tag isn't there (placeholder id, blocked, or a test).
+// On a test copy every event carries debug_mode: gtag only marks hits for DebugView from an event-level param.
 function track(name, params) {
-  if (typeof globalThis.gtag === "function") globalThis.gtag("event", name, params || {});
+  if (typeof globalThis.gtag !== "function") return;
+  var p = Object.assign({}, params);
+  if (isTestHost(globalThis.location)) p.debug_mode = true;
+  globalThis.gtag("event", name, p);
 }
 
 // win is the browser window (or a stand-in in tests). Loads nothing for a missing or placeholder id.
@@ -33,8 +39,11 @@ function measureInit(id, win) {
   // test copies show in DebugView and can be filtered out of reports as developer traffic
   // page_location never carries the hash: the Google sign-in return puts a token there
   var cfg = { page_location: win.location.origin + win.location.pathname + win.location.search };
-  if (GA_HOSTS.indexOf(win.location.hostname) < 0) cfg.debug_mode = true;
+  var test = isTestHost(win.location);
+  if (test) { cfg.debug_mode = true; cfg.send_page_view = false; }
   win.gtag("config", id, cfg);
+  // the automatic page view can't carry the debug flag, so a test copy sends its own (one, not two)
+  if (test) win.gtag("event", "page_view", { page_location: cfg.page_location, debug_mode: true });
   // the tag is added once the page has settled, after quiz.js has cleared any Google return from the address bar
   var doc = win.document;
   function add() {

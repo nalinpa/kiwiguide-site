@@ -55,7 +55,10 @@ test("config has no debug flag on kiwiguide.app, debug_mode elsewhere", () => {
   const live = fakeWin("kiwiguide.app"); measureInit(GA_ID, live);
   assert.deepEqual(calls(live).find((x) => x[0] === "config"), ["config", GA_ID, { page_location: "https://kiwiguide.app/plan/?x=1" }]);
   const test = fakeWin("test.example.workers.dev"); measureInit(GA_ID, test);
-  assert.deepEqual(calls(test).find((x) => x[0] === "config"), ["config", GA_ID, { page_location: "https://test.example.workers.dev/plan/?x=1", debug_mode: true }]);
+  assert.deepEqual(calls(test).find((x) => x[0] === "config"), ["config", GA_ID, { page_location: "https://test.example.workers.dev/plan/?x=1", debug_mode: true, send_page_view: false }]);
+  assert.deepEqual(calls(test).filter((x) => x[1] === "page_view"), [["event", "page_view", { page_location: "https://test.example.workers.dev/plan/?x=1", debug_mode: true }]]);
+  assert.equal(calls(live).filter((x) => x[1] === "page_view").length, 0);
+  assert.equal(calls(live).find((x) => x[0] === "config")[2].send_page_view, undefined);
   ["www.kiwiguide.app", "kiwiguide.blacksands.app"].forEach((h) => { const w = fakeWin(h); measureInit(GA_ID, w); assert.equal(calls(w).find((x) => x[0] === "config")[2].debug_mode, undefined); });
   const loc = fakeWin("localhost"); measureInit(GA_ID, loc); assert.equal(calls(loc).find((x) => x[0] === "config")[2].debug_mode, true);
 });
@@ -78,4 +81,13 @@ test("quiz.js's pure functions load in Node with no global track (the page code 
   assert.equal(typeof globalThis.track, "undefined");
   const Q = createRequire(import.meta.url)("../public/plan/quiz.js");
   assert.equal(typeof Q.stepFromHash, "function");
+});
+test("track adds debug_mode on test hosts only", () => {
+  const seen = [];
+  globalThis.gtag = (...a) => seen.push(a);
+  try {
+    globalThis.location = { hostname: "test.example.workers.dev" }; track("quiz_start");
+    globalThis.location = { hostname: "kiwiguide.app" }; track("quiz_start", { a: 1 });
+  } finally { delete globalThis.gtag; delete globalThis.location; }
+  assert.deepEqual(seen, [["event", "quiz_start", { debug_mode: true }], ["event", "quiz_start", { a: 1 }]]);
 });

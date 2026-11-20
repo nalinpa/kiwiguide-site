@@ -214,6 +214,14 @@ if (typeof document !== "undefined") (function () {
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 
   var SAVED = "kg-saved";
+  var GOOGLE = "kg-google"; // { state, nonce } while the visitor is at Google; removed on return
+  var G_MARK = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
+  // Back from Google: the answer is in the address bar (#id_token=..&state=..). Take it and clear it before anything else.
+  var gret = readGoogleReturn(location.hash), gsaved = null;
+  if (gret) {
+    try { gsaved = JSON.parse(sessionStorage.getItem(GOOGLE)); sessionStorage.removeItem(GOOGLE); } catch (e) { /* refused below */ }
+    history.replaceState(null, "", location.pathname + location.search + "#7");
+  }
   var session = null; // { idToken, email }: in memory only, never stored
   var acct = { mode: "create", error: "", note: "", existing: null, email: "" };
   var g = guard(); // one sign-in, save or replace at a time
@@ -330,9 +338,11 @@ if (typeof document !== "undefined") (function () {
       var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in to save your trip" : "Save your trip";
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
       var dby = ' aria-describedby="q-err"';
-      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + "</p>" +
+      var google = mode === "forgot" ? "" : '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
+      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + "</p>" + google +
         '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
         (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required' + dby + "></label>") +
+        (mode === "create" ? '<label>Confirm password<input id="q-pass2" type="password" name="password2" autocomplete="new-password" required' + dby + "></label>" : "") +
         '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
         '<button type="submit" class="q-cta" id="q-go">' + (mode === "forgot" ? "Send reset email" : mode === "signin" ? "Sign in" : "Create account") + "</button></form>" +
         '<p class="q-alt">' + (mode === "create" ? 'Already have one? <button type="button" class="q-link" data-act="mode" data-val="signin">Sign in</button>' :
@@ -443,6 +453,7 @@ if (typeof document !== "undefined") (function () {
     else if (act === "again") { st = blank(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(0); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(7); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
+    else if (act === "google") goGoogle();
     else if (act === "retry") doSave();
     else if (act === "replace") doReplace();
     else if (act === "keep") keepIt();
@@ -452,7 +463,7 @@ if (typeof document !== "undefined") (function () {
   function setErr(text, field, ok) {
     var e = document.getElementById("q-err");
     if (e) { e.textContent = text; e.className = "q-error" + (ok ? " q-ok" : ""); }
-    ["q-email", "q-pass"].forEach(function (id) {
+    ["q-email", "q-pass", "q-pass2"].forEach(function (id) {
       var i = document.getElementById(id);
       if (i) { if (field === id && !ok) i.setAttribute("aria-invalid", "true"); else i.removeAttribute("aria-invalid"); }
     });
@@ -460,7 +471,7 @@ if (typeof document !== "undefined") (function () {
   function setDisabled(b) { Array.prototype.forEach.call(root.querySelectorAll("button"), function (x) { x.disabled = b; }); }
   function fieldFor(code) {
     var c = String(code || "").split(/[\s:]/)[0];
-    return c === "EMAIL_EXISTS" || c === "INVALID_EMAIL" ? "q-email" : c === "WEAK_PASSWORD" || c === "INVALID_LOGIN_CREDENTIALS" || c === "INVALID_PASSWORD" || c === "EMAIL_NOT_FOUND" ? "q-pass" : null;
+    return c === "PASSWORDS_DIFFER" ? "q-pass2" : c === "EMAIL_EXISTS" || c === "INVALID_EMAIL" ? "q-email" : c === "WEAK_PASSWORD" || c === "INVALID_LOGIN_CREDENTIALS" || c === "INVALID_PASSWORD" || c === "EMAIL_NOT_FOUND" ? "q-pass" : null;
   }
   function thisTrip() { return trips.filter(function (x) { return x.key === st.pick; })[0]; }
   function newBody() { return tripBody(thisTrip(), startDateFor(st, new Date()), function () { return crypto.randomUUID(); }); }
@@ -507,7 +518,8 @@ if (typeof document !== "undefined") (function () {
   // Escape on the dialog means Keep (cancel does not bubble, so listen while it goes down).
   root.addEventListener("cancel", function (e) { e.preventDefault(); keepIt(); }, true);
   // newer Chrome can close on Escape without cancel (no interaction since showModal); close does not bubble either
-  root.addEventListener("close", keepIt, true);
+  // ignore it when the dialog has been re-rendered away (a failed Replace), so that can never count as Keep
+  root.addEventListener("close", function (e) { if (e.target.isConnected) keepIt(); }, true);
 
   root.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -522,12 +534,30 @@ if (typeof document !== "undefined") (function () {
       return run(function () { return resetPassword(net, email); }, function () { setDisabled(false); setErr("If that email has an account, a reset link is on its way.", null, true); });
     }
     run(function () {
-      return (acct.mode === "signin" ? signIn : signUp)(net, email, passEl.value).then(function (s) {
+      return (acct.mode === "signin" ? signIn(net, email, passEl.value) : createAccount(net, email, passEl.value, document.getElementById("q-pass2").value)).then(function (s) {
         session = s;
         return saveFlow(net, s.idToken, newBody());
       });
     }, afterSave);
   });
+
+  // Off to Google. The state and nonce wait in sessionStorage (the quiz answers already do); the tokens never do.
+  function goGoogle() {
+    var state = newToken(), nonce = newToken();
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce })); } catch (e) { return setErr(authErrorMessage("")); }
+    location.assign(googleAuthUrl(location.origin, state, nonce));
+  }
+  // The visitor is back from Google: sign in with its answer, then the same save flow as for email.
+  function finishGoogle() {
+    var net = fetch.bind(window), r = gret, sv = gsaved;
+    gret = gsaved = null;
+    run(function () {
+      return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
+        session = s;
+        return saveFlow(net, s.idToken, newBody());
+      });
+    }, afterSave);
+  }
 
   backBtn.addEventListener("click", function () {
     var step = stepFromHash(location.hash);
@@ -542,6 +572,7 @@ if (typeof document !== "undefined") (function () {
       st = cleanState(st, trips, new Date());
       save();
       render();
+      if (gret && stepFromHash(location.hash) === 7) finishGoogle();
     } catch (e) {
       root.innerHTML = '<h1>Something went wrong</h1><p>The quiz hit a problem. Reload the page, or <a href="/#trips">see the suggested trips</a>.</p>';
     }

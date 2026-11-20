@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 const A = createRequire(import.meta.url)("../public/plan/account.js");
-const { tripBody, authErrorMessage, saveErrorMessage, saveFlow, signUp, replaceTrip, tripDates, guard } = A;
+const { tripBody, authErrorMessage, saveErrorMessage, saveFlow, signUp, replaceTrip, tripDates, guard, GOOGLE_WEB_CLIENT_ID, googleAuthUrl, readGoogleReturn, signInWithGoogle, completeGoogle, newToken, createAccount } = A;
 const { trips } = JSON.parse(readFileSync(new URL("../public/plan/trips.json", import.meta.url), "utf8"));
 const ten = trips.find((t) => t.days.length === 10);
 let n = 0;
@@ -139,4 +139,90 @@ test("tripDates", () => {
 test("saveTrip 409 throws status and error", async () => {
   const f = fake((u, o) => (o.method === "POST" ? res(409, { ok: false, error: "date_overlap" }) : res(200, { data: { itineraries: [] } })));
   await assert.rejects(saveFlow(f, "T", body), (e) => e.status === 409 && e.error === "date_overlap");
+});
+
+// ---- Continue with Google ----
+const jwt = (nonce) => "h." + Buffer.from(JSON.stringify({ nonce })).toString("base64url") + ".s";
+const SAVED_G = { state: "S1", nonce: "N1" };
+
+test("googleAuthUrl has the client id, the redirect, response_type id_token, the nonce and the state", () => {
+  const u = new URL(googleAuthUrl("https://kiwiguide.app", "S1", "N1"));
+  assert.equal(u.origin + u.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
+  assert.equal(u.searchParams.get("client_id"), GOOGLE_WEB_CLIENT_ID);
+  assert.match(GOOGLE_WEB_CLIENT_ID, /^317359472880-e6b6.*\.apps\.googleusercontent\.com$/);
+  assert.equal(u.searchParams.get("redirect_uri"), "https://kiwiguide.app/plan/");
+  assert.equal(u.searchParams.get("response_type"), "id_token");
+  assert.equal(u.searchParams.get("scope"), "openid email profile");
+  assert.equal(u.searchParams.get("nonce"), "N1");
+  assert.equal(u.searchParams.get("state"), "S1");
+  assert.equal(u.searchParams.get("prompt"), "select_account");
+});
+
+test("readGoogleReturn reads id_token and state from the fragment; null without them", () => {
+  assert.deepEqual(readGoogleReturn("#id_token=abc.d.e&state=S1&authuser=0"), { idToken: "abc.d.e", state: "S1" });
+  assert.deepEqual(readGoogleReturn("#error=access_denied&state=S1"), { error: "access_denied", state: "S1" });
+  assert.equal(readGoogleReturn("#7"), null);
+  assert.equal(readGoogleReturn(""), null);
+  assert.equal(readGoogleReturn("#id_token=abc"), null);
+  assert.equal(readGoogleReturn("#state=S1"), null);
+});
+
+test("newToken is base64url of at least 16 random bytes, different each time", () => {
+  const a = newToken(), b = newToken();
+  assert.match(a, /^[A-Za-z0-9_-]{22,}$/);
+  assert.notEqual(a, b);
+});
+
+test("a returned state that doesn't match the saved one is refused, with no network call", async () => {
+  const f = fake(() => res(200, {}));
+  for (const [ret, saved] of [[{ idToken: jwt("N1"), state: "OTHER" }, SAVED_G], [{ idToken: jwt("N1"), state: "S1" }, null], [{ idToken: jwt("N1"), state: "S1" }, { state: "", nonce: "N1" }], [{ idToken: jwt("WRONG"), state: "S1" }, SAVED_G]]) {
+    await assert.rejects(completeGoogle(f, ret, saved, "https://kiwiguide.app/plan/"), (e) => typeof e.code === "string");
+  }
+  assert.equal(f.calls.length, 0);
+});
+
+test("a Google error (cancelled) with the right state ends with the cancel code, no network call", async () => {
+  const f = fake(() => res(200, {}));
+  await assert.rejects(completeGoogle(f, { error: "access_denied", state: "S1" }, SAVED_G, "x"), { code: "GOOGLE_CANCELLED" });
+  await assert.rejects(completeGoogle(f, { error: "server_error", state: "S1" }, SAVED_G, "x"), { code: "" });
+  assert.equal(f.calls.length, 0);
+});
+
+test("signInWithGoogle posts postBody with id_token and providerId google.com, and returns the idToken", async () => {
+  const f = fake(() => res(200, { idToken: "FT", email: "g@x.co", isNewUser: true }));
+  assert.deepEqual(await signInWithGoogle(f, "G.T.K", "https://kiwiguide.app/plan/"), { idToken: "FT", email: "g@x.co", isNew: true });
+  assert.match(f.calls[0].url, /accounts:signInWithIdp\?key=/);
+  assert.deepEqual(JSON.parse(f.calls[0].opts.body), { postBody: "id_token=G.T.K&providerId=google.com", requestUri: "https://kiwiguide.app/plan/", returnSecureToken: true, returnIdpCredential: true });
+});
+
+test("signInWithGoogle: needConfirmation (the email has a password account) and api errors carry codes", async () => {
+  await assert.rejects(signInWithGoogle(fake(() => res(200, { needConfirmation: true, email: "a@b.co" })), "t", "u"), { code: "NEED_CONFIRMATION" });
+  await assert.rejects(signInWithGoogle(fake(() => res(400, { error: { message: "FEDERATED_USER_ID_ALREADY_LINKED" } })), "t", "u"), { code: "FEDERATED_USER_ID_ALREADY_LINKED" });
+  await assert.rejects(signInWithGoogle(async () => { throw new Error("offline"); }, "t", "u"), { code: "" });
+});
+
+test("authErrorMessage: an email that already has a password account says to sign in with the password", () => {
+  for (const c of ["NEED_CONFIRMATION", "FEDERATED_USER_ID_ALREADY_LINKED"]) assert.match(authErrorMessage(c), /password/i);
+  assert.match(authErrorMessage("NEED_CONFIRMATION"), /sign in with your password/i);
+  assert.equal(authErrorMessage("GOOGLE_CANCELLED"), "");
+});
+
+test("after Google sign-in the save flow runs as for email: list, then POST", async () => {
+  const f = fake((u, o) => {
+    if (u.includes("signInWithIdp")) return res(200, { idToken: "FT", email: "g@x.co" });
+    if (o.method === "GET") return res(200, { ok: true, data: { itineraries: [] } });
+    return res(200, { ok: true });
+  });
+  const s = await completeGoogle(f, { idToken: jwt("N1"), state: "S1" }, SAVED_G, "https://kiwiguide.app/plan/");
+  assert.equal((await saveFlow(f, s.idToken, body)).result, "saved");
+  assert.deepEqual(f.calls.map((c) => (c.opts.method || "") + " " + (c.url.includes("identity") ? "idp" : "api")), ["POST idp", "GET api", "POST api"]);
+  assert.equal(f.calls[1].opts.headers.Authorization, "Bearer FT");
+});
+
+test("create account refuses a confirm that doesn't match, without calling signUp", async () => {
+  const f = fake(() => res(200, { idToken: "T", email: "a@b.co" }));
+  await assert.rejects(createAccount(f, "a@b.co", "pw1234", "pw12345"), { code: "PASSWORDS_DIFFER" });
+  assert.equal(f.calls.length, 0);
+  assert.match(authErrorMessage("PASSWORDS_DIFFER"), /^The passwords don't match\.$/);
+  assert.equal((await createAccount(f, "a@b.co", "pw1234", "pw1234")).idToken, "T");
 });

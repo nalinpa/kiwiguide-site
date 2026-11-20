@@ -38,6 +38,11 @@ function authCall(fetchFn, method, email, password) {
   }, function () { throw { code: "" }; });
 }
 function signUp(fetchFn, email, password) { return authCall(fetchFn, "signUp", email, password); }
+// Create account: the confirm field must match before anything is sent.
+function createAccount(fetchFn, email, password, confirm) {
+  if (password !== confirm) return Promise.reject({ code: "PASSWORDS_DIFFER" });
+  return signUp(fetchFn, email, password);
+}
 function signIn(fetchFn, email, password) { return authCall(fetchFn, "signInWithPassword", email, password); }
 
 // Same email the app sends today.
@@ -53,6 +58,58 @@ function resetPassword(fetchFn, email) {
       if (!/^EMAIL_NOT_FOUND/.test(String(d && d.error && d.error.message))) throw { code: "" };
     });
   }, function () { throw { code: "" }; });
+}
+
+// ---- Continue with Google: OpenID Connect redirect, no Google script ----
+var GOOGLE_WEB_CLIENT_ID = "317359472880-e6b6ncp7fjpjmbradr7am1kumbnjgrts.apps.googleusercontent.com"; // the app's public web OAuth client id
+
+function googleAuthUrl(origin, state, nonce) {
+  var q = { client_id: GOOGLE_WEB_CLIENT_ID, redirect_uri: origin + "/plan/", response_type: "id_token", scope: "openid email profile", nonce: nonce, state: state, prompt: "select_account" };
+  return "https://accounts.google.com/o/oauth2/v2/auth?" + Object.keys(q).map(function (k) { return k + "=" + encodeURIComponent(q[k]); }).join("&");
+}
+
+// 16 random bytes as base64url
+function newToken() {
+  var b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode.apply(null, b)).replace(/[+]/g, "-").replace(/[/]/g, "_").replace(/=+$/, "");
+}
+
+// { idToken, state } or { error, state } from Google's fragment; null when it isn't a Google return.
+function readGoogleReturn(hash) {
+  var p = new URLSearchParams(String(hash).replace(/^#/, ""));
+  var state = p.get("state");
+  if (!state) return null;
+  if (p.get("id_token")) return { idToken: p.get("id_token"), state: state };
+  if (p.get("error")) return { error: p.get("error"), state: state };
+  return null;
+}
+
+function jwtNonce(t) {
+  try { return JSON.parse(atob(String(t).split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).nonce; } catch (e) { return undefined; }
+}
+
+function signInWithGoogle(fetchFn, googleIdToken, requestUri) {
+  return fetchFn(IDT + "signInWithIdp?key=" + encodeURIComponent(FIREBASE_WEB_KEY), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ postBody: "id_token=" + googleIdToken + "&providerId=google.com", requestUri: requestUri, returnSecureToken: true, returnIdpCredential: true }),
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok) throw { code: String((data && data.error && data.error.message) || "") };
+      // the email already has a password account: Firebase asks to confirm instead of linking
+      if (data.needConfirmation || !data.idToken) throw { code: "NEED_CONFIRMATION" };
+      return { idToken: data.idToken, email: data.email, isNew: !!data.isNewUser };
+    });
+  }, function () { throw { code: "" }; });
+}
+
+// The state is checked first (and the nonce inside the token); nothing goes to the network unless both match what the page saved before leaving.
+function completeGoogle(fetchFn, ret, saved, requestUri) {
+  if (!ret || !saved || !saved.state || ret.state !== saved.state) return Promise.reject({ code: "" });
+  if (ret.error) return Promise.reject({ code: ret.error === "access_denied" ? "GOOGLE_CANCELLED" : "" });
+  if (!saved.nonce || jwtNonce(ret.idToken) !== saved.nonce) return Promise.reject({ code: "" });
+  return signInWithGoogle(fetchFn, ret.idToken, requestUri);
 }
 
 function api(fetchFn, idToken, method, payload, id) {
@@ -129,6 +186,9 @@ function authErrorMessage(code) {
   if (c === "EMAIL_EXISTS") return "That email already has an account. Sign in instead.";
   if (c === "WEAK_PASSWORD") return "Choose a password with at least 6 characters.";
   if (c === "INVALID_LOGIN_CREDENTIALS" || c === "INVALID_PASSWORD" || c === "EMAIL_NOT_FOUND") return "The email or password is wrong.";
+  if (c === "NEED_CONFIRMATION" || c === "FEDERATED_USER_ID_ALREADY_LINKED") return "That email already has a password account. Sign in with your password instead.";
+  if (c === "PASSWORDS_DIFFER") return "The passwords don't match.";
+  if (c === "GOOGLE_CANCELLED") return "";
   if (c === "INVALID_EMAIL") return "Check the email address.";
   if (c === "TOO_MANY_ATTEMPTS_TRY_LATER") return "Too many tries. Wait a few minutes and try again.";
   return GENERIC;
@@ -141,4 +201,4 @@ function saveErrorMessage(status, error) {
   return "The trip could not be saved. Your account is kept. Try again.";
 }
 
-if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };
+if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, GOOGLE_WEB_CLIENT_ID: GOOGLE_WEB_CLIENT_ID, googleAuthUrl: googleAuthUrl, newToken: newToken, readGoogleReturn: readGoogleReturn, signInWithGoogle: signInWithGoogle, completeGoogle: completeGoogle, createAccount: createAccount, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };

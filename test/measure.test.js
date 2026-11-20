@@ -7,7 +7,7 @@ const KEYS = ["ad_storage", "ad_user_data", "ad_personalization", "analytics_sto
 
 function fakeWin(hostname) {
   const appended = [];
-  return { appended, location: { hostname, origin: "https://" + hostname, pathname: "/plan/", search: "?x=1", hash: "#id_token=SECRET&state=abc" }, document: { createElement: () => ({}), head: { appendChild: (s) => appended.push(s) } } };
+  return { appended, location: { hostname, origin: "https://" + hostname, pathname: "/plan/", search: "?x=1", hash: "#id_token=SECRET&state=abc" }, document: { readyState: "complete", listeners: [], addEventListener(n, f) { this.listeners.push(f); }, createElement: () => ({}), head: { appendChild: (s) => appended.push(s) } } };
 }
 const calls = (w) => w.dataLayer.map((a) => Array.from(a));
 
@@ -64,7 +64,17 @@ test("page_location never has a hash, so a Google return token never reaches ana
   assert.ok(!JSON.stringify(calls(w)).includes("#"));
   assert.ok(!JSON.stringify(calls(w)).includes("SECRET"));
 });
-test("quiz.js loads and its functions run with no global track", () => {
+test("the tag waits for DOMContentLoaded while the page is loading, but the queue is set up at once", () => {
+  const w = fakeWin("kiwiguide.app"); w.document.readyState = "loading";
+  measureInit(GA_ID, w);
+  assert.equal(w.appended.length, 0);
+  assert.equal(calls(w).find((x) => x[0] === "config")[0], "config");
+  w.document.listeners.forEach((f) => f());
+  assert.equal(w.appended.length, 1);
+  const done = fakeWin("kiwiguide.app"); measureInit(GA_ID, done);
+  assert.equal(done.appended.length, 1);
+});
+test("quiz.js's pure functions load in Node with no global track (the page code does not run here)", () => {
   assert.equal(typeof globalThis.track, "undefined");
   const Q = createRequire(import.meta.url)("../public/plan/quiz.js");
   assert.equal(typeof Q.stepFromHash, "function");

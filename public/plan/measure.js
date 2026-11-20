@@ -35,10 +35,15 @@ function measureInit(id, win) {
   var cfg = { page_location: win.location.origin + win.location.pathname + win.location.search };
   if (GA_HOSTS.indexOf(win.location.hostname) < 0) cfg.debug_mode = true;
   win.gtag("config", id, cfg);
-  var s = win.document.createElement("script");
-  s.async = true;
-  s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);
-  win.document.head.appendChild(s);
+  // the tag is added once the page has settled, after quiz.js has cleared any Google return from the address bar
+  var doc = win.document;
+  function add() {
+    var s = doc.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);
+    doc.head.appendChild(s);
+  }
+  if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", add); else add();
   return true;
 }
 

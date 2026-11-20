@@ -252,7 +252,7 @@ if (typeof document !== "undefined") (function () {
   try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = saved; } catch (e) { /* works without it */ }
   var track = typeof window.track === "function" ? window.track : function () {}; // the quiz works without measure.js
   var started = !!st.start, revealed = ""; try { revealed = sessionStorage.getItem("kg-revealed") || ""; } catch (e) { /* fires again */ }
-  // revealed // events (measure.js): quiz_start once per visit, quiz_reveal once per set of trips offered
+  // events (measure.js): quiz_start once per visit; quiz_reveal once per set of trips offered (the marker survives a reload)
   function answered(step, answer) { track("quiz_step", { step: step, answer: answer }); }
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 

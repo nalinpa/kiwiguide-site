@@ -498,11 +498,16 @@ if (typeof document !== "undefined") (function () {
   function doReplace() {
     acct.error = "";
     run(function () { return replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()); }, function () { finish(session.email, thisTrip().label); });
+    // buttons are off while it runs; say so (a failure re-renders a fresh dialog, success leaves the screen)
+    var dlg = document.getElementById("q-dialog"), rb = root.querySelector("[data-act=replace]");
+    if (g.busy() && dlg && rb) { dlg.setAttribute("aria-busy", "true"); rb.textContent = "Replacing…"; }
   }
-  function keepIt() { if (!g.busy()) finish(session.email, acct.existing.title || "Your trip", true); }
+  function keepIt() { if (session && acct.existing && !g.busy()) finish(session.email, acct.existing.title || "Your trip", true); }
 
   // Escape on the dialog means Keep (cancel does not bubble, so listen while it goes down).
   root.addEventListener("cancel", function (e) { e.preventDefault(); keepIt(); }, true);
+  // newer Chrome can close on Escape without cancel (no interaction since showModal); close does not bubble either
+  root.addEventListener("close", keepIt, true);
 
   root.addEventListener("submit", function (e) {
     e.preventDefault();

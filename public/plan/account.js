@@ -82,7 +82,7 @@ function stamp(t) {
   var u = t && t.updatedAt;
   return typeof u === "number" ? u : Date.parse(u) || 0;
 }
-// Newest update first; the api already sorts that way, but the page does not rely on it.
+// Newest update first. The page sorts by updatedAt itself (the api also returns updatedAt DESC) so it never depends on the api's order.
 function newestFirst(list) {
   return list.map(function (t, i) { return { t: t, i: i }; }).sort(function (a, b) { return stamp(b.t) - stamp(a.t) || a.i - b.i; }).map(function (x) { return x.t; });
 }
@@ -103,7 +103,7 @@ function guard() {
 }
 
 // The app keeps one trip per person. No trip: save. A trip: hand it back so the page can ask before replacing it
-// (the list is newest-updated first, so the first one is the one to replace).
+// (newestFirst puts the most recently updated first, so that is the one to replace).
 function saveFlow(fetchFn, idToken, body) {
   return listTrips(fetchFn, idToken).then(function (existing) {
     if (existing.length) return { result: "has-trip", existing: newestFirst(existing)[0] };

@@ -403,7 +403,7 @@ if (typeof document !== "undefined") (function () {
     },
   };
 
-  // The one-time nudge on card 1 (right, then left). Anything the visitor does cancels it.
+  // The one-time nudge on card 1 (right, then left), about 3 s. Anything the visitor does cancels it.
   var HINT = "kg-hint", hintTimer = null, hintAnims = [];
   function stopHint() { clearTimeout(hintTimer); hintAnims.forEach(function (a) { a.cancel(); }); hintAnims = []; }
   function startHint(card, yes, no) {
@@ -412,13 +412,14 @@ if (typeof document !== "undefined") (function () {
     if (seen || reduced || st.idx !== 0 || !card.animate) return;
     hintTimer = setTimeout(function () {
       try { sessionStorage.setItem(HINT, "1"); } catch (e) { /* fine */ }
-      var o = { duration: 1500, easing: "ease-in-out" };
+      // 3 s: out to one side 600 ms, hold 400, back 500; then the other side the same.
+      var o = { duration: 3000 }, R = "translateX(40px) rotate(2.2deg)", L = "translateX(-40px) rotate(-2.2deg)";
       hintAnims = [
-        card.animate([{ transform: "none" }, { transform: "translateX(40px) rotate(2.2deg)", offset: 0.17 }, { transform: "none", offset: 0.4 }, { transform: "translateX(-40px) rotate(-2.2deg)", offset: 0.62 }, { transform: "none", offset: 0.85 }, { transform: "none" }], o),
-        yes.animate([{ opacity: 0 }, { opacity: 0.6, offset: 0.17 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }], o),
-        no.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 0.6, offset: 0.62 }, { opacity: 0, offset: 0.85 }, { opacity: 0 }], o),
+        card.animate([{ transform: "none", easing: "ease-out" }, { transform: R, offset: 0.2 }, { transform: R, offset: 0.333, easing: "ease-in-out" }, { transform: "none", offset: 0.5, easing: "ease-out" }, { transform: L, offset: 0.7 }, { transform: L, offset: 0.833, easing: "ease-in-out" }, { transform: "none" }], o),
+        yes.animate([{ opacity: 0, easing: "ease-out" }, { opacity: 0.6, offset: 0.2 }, { opacity: 0.6, offset: 0.333, easing: "ease-in-out" }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], o),
+        no.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5, easing: "ease-out" }, { opacity: 0.6, offset: 0.7 }, { opacity: 0.6, offset: 0.833, easing: "ease-in-out" }, { opacity: 0 }], o),
       ];
-    }, 400);
+    }, 600);
   }
 
   function removeKeys() { if (keyHandler) { document.removeEventListener("keydown", keyHandler); keyHandler = null; } }

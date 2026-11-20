@@ -255,18 +255,18 @@ if (typeof document !== "undefined") (function () {
         '<p class="q-facts">' + esc(c.facts) + "</p><p>" + esc(c.what) + "</p>" +
         '<p class="q-sm"><strong>Yes if</strong> ' + esc(c.yesIf) + '</p><p class="q-sm q-skip"><strong>Skip if</strong> ' + esc(c.skipIf) + "</p></div></div>" +
         '<span class="q-stamp q-yes" id="stamp-yes" aria-hidden="true">YES</span><span class="q-stamp q-no" id="stamp-no" aria-hidden="true">NOPE</span></div></div>' +
-        '<div class="q-deck-btns"><button type="button" class="q-round" data-act="no" aria-label="No, skip this place"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        '<div class="q-deck-btns"><button type="button" class="q-round q-round-no" data-act="no" aria-label="No, skip this place"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
         '<button type="button" class="q-round q-round-yes" data-act="yes" aria-label="Yes, I would do this"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.5 1.2 4.3 2.4h2c.8-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg></button></div>';
     },
     3: function () {
       var n = interestsFrom(st.liked).length;
-      return '<p class="q-kicker">' + (n ? "Nice. " + n + (n === 1 ? " thing" : " things") + " you’re into, noted." : "Noted.") + '</p><h1 tabindex="-1">When are you coming?</h1>' +
-        SEASONS.map(function (s) { return choice(s.label, s.hint, "season", s.id); }).join("") +
+      return '<p class="q-kicker">' + (n ? "Nice. " + n + (n === 1 ? " thing" : " things") + " you’re into, noted." : "Noted.") + '</p><h1 tabindex="-1">When are you coming?</h1><p class="q-lead">Seasons are flipped down here: a New Zealand summer is December to February.</p>' +
+        SEASONS.map(function (s) { return choice(s.label, s.hint + ", NZ " + s.label.toLowerCase(), "season", s.id); }).join("") +
         choice("Not sure yet", "Set your dates later in the app", "season", "unsure");
     },
     4: function () {
       var s = SEASONS.filter(function (x) { return x.id === st.season; })[0];
-      return '<p class="q-kicker">' + s.label + " · " + s.hint + '</p><h1 tabindex="-1">Which month?</h1>' +
+      return '<p class="q-kicker">' + "NZ " + s.label.toLowerCase() + " · " + s.hint + '</p><h1 tabindex="-1">Which month?</h1>' +
         monthsOf(s.id, new Date()).map(function (m) { return choice(MONTH_NAMES[m.month] + " " + m.year, "", "month", m.month + "-" + m.year); }).join("") +
         choice("Not sure which month", "", "month", "");
     },
@@ -291,8 +291,9 @@ if (typeof document !== "undefined") (function () {
       var sline = seasonLine(st.season);
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when">From ' + townName(st.start) + " · " + days(t.days.length) + " · " + (when ? when + " · dates" : "Dates") + " to set in the app</p>" +
+        '<div class="q-actions"><a class="q-cta" href="' + APP + '">Save this trip</a><button type="button" class="q-again" data-act="again">Start again</button></div>' +
         (line ? '<p class="q-match">' + esc(line) + "</p>" : "") +
-        t.days.map(function (d, n) {
+        '<div class="q-days">' + t.days.map(function (d, n) {
           return '<section class="q-day"><h2>Day ' + (n + 1) + " <span>· " + esc(d.town) + "</span></h2><ul>" +
             d.items.map(function (i) {
               var m = stopMatches(i, interests);
@@ -300,9 +301,9 @@ if (typeof document !== "undefined") (function () {
                 (i.thumb ? '<img src="' + esc(i.thumb) + '" alt="" width="56" height="56" loading="lazy">' : '<span class="q-noimg">' + esc(i.category[0] || "") + "</span>") +
                 "<div><p>" + esc(i.siteName) + "</p><small>" + esc(i.timeLabel + " · " + i.durationLabel) + "</small></div>" + (m ? '<b class="q-youliked">You liked</b>' : "") + "</li>";
             }).join("") + "</ul></section>";
-        }).join("") +
+        }).join("") + "</div>" +
         (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
-        '<div class="q-save"><a class="q-cta" href="' + APP + '">Save this trip</a><button type="button" class="q-again" data-act="again">Start again</button></div>';
+        '<div class="q-actions"><a class="q-cta" href="' + APP + '">Save this trip</a></div>';
     },
   };
 

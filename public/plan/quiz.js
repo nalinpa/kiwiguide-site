@@ -341,7 +341,7 @@ if (typeof document !== "undefined") (function () {
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
       var dby = ' aria-describedby="q-err"';
       var google = mode === "forgot" ? "" : '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
-      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + '</p><p class="q-status" id="q-status" role="status" aria-live="polite"></p>' + google +
+      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + '</p><p class="q-status" id="q-status" role="status"></p>' + google +
         '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
         (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required' + dby + "></label>") +
         (mode === "create" ? '<label>Confirm password<input id="q-pass2" type="password" name="password2" autocomplete="new-password" required' + dby + "></label>" : "") +
@@ -560,7 +560,7 @@ if (typeof document !== "undefined") (function () {
   function finishGoogle() {
     var net = fetch.bind(window), r = gret, sv = gsaved;
     gret = gsaved = null;
-    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…";
+    setTimeout(function () { var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…"; }, 0); // next tick, so screen readers announce it
     run(function () {
       return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
         session = s;
@@ -582,7 +582,7 @@ if (typeof document !== "undefined") (function () {
       st = cleanState(st, trips, new Date());
       save();
       var back = gfrag && !savedInfo(); // already saved: render goes to the saved screen
-      if (back && !st.pick) notice = "Your Google sign-in timed out. Please try again.";
+      if (back && !st.pick && !(gret && gret.error === "access_denied")) notice = "Your answers were lost on the way back from Google. Pick your trip again.";
       render();
       if (back && st.pick && stepFromHash(location.hash) === 7) finishGoogle();
     } catch (e) {

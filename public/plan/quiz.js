@@ -13,7 +13,7 @@ var BANDS = [
 var PHOTO = "https://api.blacksands.app/images/southislandguide/";
 var TOWNS = [
   { id: "queenstown", name: "Queenstown", sub: "Fly in to the lakes and mountains, with Wānaka and Milford Sound close by.", range: "a weekend to three weeks", img: PHOTO + "a6904a0d-2c8e-4f25-b533-e51241d6665e.webp" },
-  { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", range: "a day to three weeks", img: PHOTO + "f7122313-14d3-4813-8c48-b6fd8de833b5.webp" },
+  { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", range: "a day to three weeks", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
   { id: "picton", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", range: "a long weekend to three weeks", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
 ];
 

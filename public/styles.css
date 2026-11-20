@@ -507,3 +507,4 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
 .q-google:disabled { opacity: 0.6; cursor: default; }
 .q-or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--muted); font-size: 0.875rem; }
 .q-or::before, .q-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.q-status { margin: 0; min-height: 0; text-align: center; color: var(--muted); font-weight: 600; }

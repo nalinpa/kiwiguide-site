@@ -226,3 +226,10 @@ test("create account refuses a confirm that doesn't match, without calling signU
   assert.match(authErrorMessage("PASSWORDS_DIFFER"), /^The passwords don't match\.$/);
   assert.equal((await createAccount(f, "a@b.co", "pw1234", "pw1234")).idToken, "T");
 });
+
+test("signInWithGoogle: Identity Toolkit's 200 with errorMessage and no idToken (returnIdpCredential) means a password account; the email is kept", async () => {
+  for (const b of [{ needConfirmation: true, email: "a@b.co" }, { errorMessage: "EMAIL_EXISTS", email: "a@b.co" }, { errorMessage: "FEDERATED_USER_ID_ALREADY_LINKED", email: "a@b.co" }]) {
+    await assert.rejects(signInWithGoogle(fake(() => res(200, b)), "t", "u"), { code: "NEED_CONFIRMATION", email: "a@b.co" });
+  }
+  await assert.rejects(signInWithGoogle(fake(() => res(200, { errorMessage: "SOMETHING_ELSE" })), "t", "u"), { code: "" });
+});

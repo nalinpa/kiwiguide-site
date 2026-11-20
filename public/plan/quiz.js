@@ -217,9 +217,11 @@ if (typeof document !== "undefined") (function () {
   var GOOGLE = "kg-google"; // { state, nonce } while the visitor is at Google; removed on return
   var G_MARK = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
   // Back from Google: the answer is in the address bar (#id_token=..&state=..). Take it and clear it before anything else.
-  var gret = readGoogleReturn(location.hash), gsaved = null;
-  if (gret) {
-    try { gsaved = JSON.parse(sessionStorage.getItem(GOOGLE)); sessionStorage.removeItem(GOOGLE); } catch (e) { /* refused below */ }
+  // Anything that carries id_token or error is cleared, even if it is malformed or the saved key is corrupt.
+  var gfrag = /(^|[#&])(id_token|error)=/.test(location.hash), gret = null, gsaved = null, notice = "";
+  if (gfrag) {
+    gret = readGoogleReturn(location.hash);
+    try { gsaved = JSON.parse(sessionStorage.getItem(GOOGLE)); } catch (e) { /* refused later */ } finally { try { sessionStorage.removeItem(GOOGLE); } catch (e2) { /* fine */ } }
     history.replaceState(null, "", location.pathname + location.search + "#7");
   }
   var session = null; // { idToken, email }: in memory only, never stored
@@ -339,7 +341,7 @@ if (typeof document !== "undefined") (function () {
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
       var dby = ' aria-describedby="q-err"';
       var google = mode === "forgot" ? "" : '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
-      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + "</p>" + google +
+      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + '</p><p class="q-status" id="q-status" role="status" aria-live="polite"></p>' + google +
         '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
         (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required' + dby + "></label>") +
         (mode === "create" ? '<label>Confirm password<input id="q-pass2" type="password" name="password2" autocomplete="new-password" required' + dby + "></label>" : "") +
@@ -375,6 +377,7 @@ if (typeof document !== "undefined") (function () {
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
     backBtn.hidden = step === 0 || step === 8;
+    if (notice) { root.insertAdjacentHTML("afterbegin", '<p class="q-error" role="alert">' + esc(notice) + "</p>"); notice = ""; }
     root.scrollTop = 0;
     window.scrollTo(0, 0);
     var h = root.querySelector("h1");
@@ -483,6 +486,12 @@ if (typeof document !== "undefined") (function () {
 
   // Every failure ends in a re-render or a re-enabled form, never a stuck disabled button.
   function fail(err) {
+    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "";
+    // the email has a password account: back to Sign in with it filled in, message kept
+    if (err && !session && (err.code === "NEED_CONFIRMATION" || err.code === "FEDERATED_USER_ID_ALREADY_LINKED")) {
+      acct = { mode: "signin", error: authErrorMessage(err.code), note: "", existing: null, email: err.email || acct.email };
+      return render();
+    }
     if (err && typeof err.code === "string") { setDisabled(false); var m = authErrorMessage(err.code); setErr(m, fieldFor(err.code)); return; }
     if (err && err.status === 401) {
       acct = { mode: "signin", error: saveErrorMessage(401), note: "", existing: null, email: session ? session.email : "" };
@@ -551,6 +560,7 @@ if (typeof document !== "undefined") (function () {
   function finishGoogle() {
     var net = fetch.bind(window), r = gret, sv = gsaved;
     gret = gsaved = null;
+    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…";
     run(function () {
       return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
         session = s;
@@ -571,8 +581,10 @@ if (typeof document !== "undefined") (function () {
       trips = d.trips;
       st = cleanState(st, trips, new Date());
       save();
+      var back = gfrag && !savedInfo(); // already saved: render goes to the saved screen
+      if (back && !st.pick) notice = "Your Google sign-in timed out. Please try again.";
       render();
-      if (gret && stepFromHash(location.hash) === 7) finishGoogle();
+      if (back && st.pick && stepFromHash(location.hash) === 7) finishGoogle();
     } catch (e) {
       root.innerHTML = '<h1>Something went wrong</h1><p>The quiz hit a problem. Reload the page, or <a href="/#trips">see the suggested trips</a>.</p>';
     }

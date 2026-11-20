@@ -98,8 +98,10 @@ function signInWithGoogle(fetchFn, googleIdToken, requestUri) {
     return r.json().then(function (data) {
       if (!r.ok) throw { code: String((data && data.error && data.error.message) || "") };
       // the email already has a password account: Firebase asks to confirm instead of linking
-      if (data.needConfirmation || !data.idToken) throw { code: "NEED_CONFIRMATION" };
-      return { idToken: data.idToken, email: data.email, isNew: !!data.isNewUser };
+      if (data.idToken && !data.needConfirmation) return { idToken: data.idToken, email: data.email, isNew: !!data.isNewUser };
+      // with returnIdpCredential Firebase answers 200 with errorMessage and no idToken
+      var m = String(data.errorMessage || "").split(/[ :]/)[0];
+      throw { code: data.needConfirmation || m === "EMAIL_EXISTS" || m === "FEDERATED_USER_ID_ALREADY_LINKED" ? "NEED_CONFIRMATION" : "", email: data.email };
     });
   }, function () { throw { code: "" }; });
 }

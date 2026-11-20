@@ -161,7 +161,7 @@ function firstOpenStep(st, step) {
   if (step >= 3 && st.idx < CARDS.length) return 2;
   if (step >= 4 && st.season === null) return 3;
   if (step === 4 && st.season === "unsure") return 3;
-  if (step === 6 && !st.pick) return 5;
+  if ((step === 6 || step === 7) && !st.pick) return 5;
   return step;
 }
 
@@ -188,7 +188,7 @@ function cleanState(saved, trips, today) {
 
 function stepFromHash(hash) {
   var n = parseInt(String(hash).replace("#", ""), 10);
-  return n >= 0 && n <= 6 ? n : 0;
+  return n >= 0 && n <= 8 ? n : 0;
 }
 
 if (typeof module !== "undefined") {
@@ -212,6 +212,11 @@ if (typeof document !== "undefined") (function () {
   var st = blank();
   try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = saved; } catch (e) { /* works without it */ }
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
+
+  var SAVED = "kg-saved";
+  var session = null; // { idToken, email }: in memory only, never stored
+  var acct = { mode: "create", error: "", note: "", existing: null };
+  function savedInfo() { try { var d = JSON.parse(sessionStorage.getItem(SAVED)); if (d && typeof d.email === "string" && typeof d.title === "string") return d; } catch (e) { /* none */ } return null; }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function townName(id) { return TOWNS.filter(function (t) { return t.id === id; })[0].name; }
@@ -291,7 +296,7 @@ if (typeof document !== "undefined") (function () {
       var sline = seasonLine(st.season);
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when">From ' + townName(st.start) + " · " + days(t.days.length) + " · " + (when ? when + " · dates" : "Dates") + " to set in the app</p>" +
-        '<div class="q-actions"><a class="q-cta" href="' + APP + '">Save this trip</a><button type="button" class="q-again" data-act="again">Start again</button></div>' +
+        '<div class="q-actions"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>' +
         (line ? '<p class="q-match">' + esc(line) + "</p>" : "") +
         '<div class="q-days">' + t.days.map(function (d, n) {
           return '<section class="q-day"><h2>Day ' + (n + 1) + " <span>· " + esc(d.town) + "</span></h2><ul>" +
@@ -303,7 +308,39 @@ if (typeof document !== "undefined") (function () {
             }).join("") + "</ul></section>";
         }).join("") + "</div>" +
         (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
-        '<div class="q-actions"><a class="q-cta" href="' + APP + '">Save this trip</a></div>';
+        '<div class="q-actions"><button type="button" class="q-cta" data-act="save">Save this trip</button></div>';
+    },
+    7: function () {
+      var t = trips.filter(function (x) { return x.key === st.pick; })[0];
+      var kicker = '<p class="q-kicker">' + esc(t.label) + "</p>";
+      if (acct.note === "has-trip") {
+        var x = acct.existing;
+        return kicker + '<h1 tabindex="-1">Replace your trip?</h1><p class="q-lead">You already have a trip: ' + esc(x.title || "Your trip") + (tripDates(x.startDate, x.endDate) ? ", " + esc(tripDates(x.startDate, x.endDate)) : "") + ". Replace it with this one?</p>" +
+          '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + '</p><div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace my trip</button><button type="button" class="q-again" data-act="keep">Keep my trip</button></div>';
+      }
+      if (session) {
+        return kicker + '<h1 tabindex="-1">Save your trip</h1><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + '</p>' +
+          '<button type="button" class="q-cta" data-act="retry">Try again</button>';
+      }
+      var mode = acct.mode;
+      var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in to save your trip" : "Save your trip";
+      var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
+      return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + "</p>" +
+        '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required></label>' +
+        (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required></label>') +
+        '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
+        '<button type="submit" class="q-cta" id="q-go">' + (mode === "forgot" ? "Send reset email" : mode === "signin" ? "Sign in" : "Create account") + "</button></form>" +
+        '<p class="q-alt">' + (mode === "create" ? 'Already have one? <button type="button" class="q-link" data-act="mode" data-val="signin">Sign in</button>' :
+          (mode === "signin" ? '<button type="button" class="q-link" data-act="mode" data-val="forgot">Forgot password?</button> · ' : "") + '<button type="button" class="q-link" data-act="mode" data-val="create">Create account</button>') + "</p>" +
+        (mode === "create" ? '<p class="q-terms">By creating an account you agree to the <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.</p>' : "");
+    },
+    8: function () {
+      var d = savedInfo();
+      return '<div class="q-done"><div class="q-tick"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+        '<h1 tabindex="-1">' + (d.kept ? "Your trip is unchanged" : "Your trip is saved") + '</h1><p class="q-lead">' + esc(d.title) + "</p>" +
+        '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
+        "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>" +
+        '<button type="button" class="q-again" data-act="again">Start again</button></div>';
     },
   };
 
@@ -314,6 +351,8 @@ if (typeof document !== "undefined") (function () {
     busy = false;
     var step = stepFromHash(location.hash);
     var ok = lowestValid(step);
+    if (step === 7 && savedInfo()) { location.replace("#8"); return; }
+    if (step === 8 && !savedInfo()) { location.replace("#" + (ok === 8 ? 6 : ok)); return; }
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
     if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
@@ -326,6 +365,7 @@ if (typeof document !== "undefined") (function () {
     var h = root.querySelector("h1");
     if (h) h.focus({ preventScroll: true });
     if (step === 2) setupDeck();
+    if (step === 7) { var f = document.getElementById("q-email"); if (f) f.focus({ preventScroll: true }); }
   }
 
   function decide(yes) {
@@ -390,7 +430,50 @@ if (typeof document !== "undefined") (function () {
     else if (act === "season") { st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? 5 : 4); }
     else if (act === "month") { var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(5); }
     else if (act === "pick") { st.pick = v; save(); go(6); }
-    else if (act === "again") { st = blank(); save(); go(0); }
+    else if (act === "again") { st = blank(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(0); }
+    else if (act === "save") { acct.error = ""; acct.note = ""; go(7); }
+    else if (act === "mode") { acct.mode = v; acct.error = ""; render(); }
+    else if (act === "retry") doSave();
+    else if (act === "replace") doReplace();
+    else if (act === "keep") finish(acct.existing.title || "Your trip", true);
+  });
+
+  function setErr(text) { var e = document.getElementById("q-err"); if (e) e.textContent = text; }
+  function thisTrip() { return trips.filter(function (x) { return x.key === st.pick; })[0]; }
+  function newBody() { return tripBody(thisTrip(), startDateFor(st, new Date()), function () { return crypto.randomUUID(); }); }
+  function fail(err) { acct.error = saveErrorMessage(err && typeof err.status === "number" ? err.status : 0, err && err.error); render(); }
+  function finish(title, kept) {
+    try { sessionStorage.setItem(SAVED, JSON.stringify({ email: session.email, title: title, kept: !!kept })); } catch (e) { /* the screen still shows this time */ }
+    session = null;
+    go(8);
+  }
+
+  function doSave() {
+    acct.error = "";
+    saveFlow(fetch.bind(window), session.idToken, newBody()).then(function (r) {
+      if (r.result === "has-trip") { acct.note = "has-trip"; acct.existing = r.existing; return render(); }
+      finish(thisTrip().label);
+    }, fail);
+  }
+  function doReplace() {
+    acct.error = "";
+    replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()).then(function () { finish(thisTrip().label); }, fail);
+  }
+
+  root.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var email = document.getElementById("q-email").value.trim();
+    var passEl = document.getElementById("q-pass");
+    var btn = document.getElementById("q-go");
+    if (!email || (passEl && !passEl.value)) return setErr("Enter your " + (passEl ? "email and password." : "email."));
+    btn.disabled = true;
+    var done = function () { btn.disabled = false; };
+    if (acct.mode === "forgot") {
+      return resetPassword(fetch.bind(window), email).then(function () { done(); setErr("If that email has an account, a reset link is on its way."); }, function (err) { done(); setErr(authErrorMessage(err && err.code)); });
+    }
+    (acct.mode === "signin" ? signIn : signUp)(fetch.bind(window), email, passEl.value).then(function (s) {
+      session = s; doSave();
+    }, function (err) { done(); setErr(authErrorMessage(err && err.code)); });
   });
 
   backBtn.addEventListener("click", function () {

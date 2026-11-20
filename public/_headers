@@ -22,7 +22,8 @@
   Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src https://identitytoolkit.googleapis.com
   X-Robots-Tag: noindex
 
-# The trip quiz shows place photos from the engine image host, so its policy adds it to img-src.
+# The trip quiz shows place photos from the engine image host (img-src) and saves the trip through
+# Firebase sign-up and the engine api (connect-src; 'self' keeps trips.json loading).
 /plan/*
   ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self'; img-src 'self' https://api.blacksands.app; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; img-src 'self' https://api.blacksands.app; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://identitytoolkit.googleapis.com https://api.blacksands.app

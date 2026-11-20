@@ -250,7 +250,9 @@ if (typeof document !== "undefined") (function () {
   function blank() { return { start: null, band: null, idx: 0, liked: [], season: null, month: null, pick: null }; }
   var st = blank();
   try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = saved; } catch (e) { /* works without it */ }
-  var started = !!st.start, revealed = ""; // events (measure.js): quiz_start once per visit, quiz_reveal once per set of trips offered
+  var track = typeof window.track === "function" ? window.track : function () {}; // the quiz works without measure.js
+  var started = !!st.start, revealed = ""; try { revealed = sessionStorage.getItem("kg-revealed") || ""; } catch (e) { /* fires again */ }
+  // revealed // events (measure.js): quiz_start once per visit, quiz_reveal once per set of trips offered
   function answered(step, answer) { track("quiz_step", { step: step, answer: answer }); }
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 
@@ -432,7 +434,7 @@ if (typeof document !== "undefined") (function () {
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
     if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
-    if ((step === 5 || step === 6)) { var offered = tripList().map(function (t) { return t.key; }).join(","); if (offered !== revealed) { revealed = offered; track("quiz_reveal", { trips: offered }); } }
+    if ((step === 5 || step === 6)) { var offered = tripList().map(function (t) { return t.key; }).join(","); if (offered !== revealed) { revealed = offered; try { sessionStorage.setItem("kg-revealed", offered); } catch (e) { /* fires again */ } track("quiz_reveal", { trips: offered }); } }
     root.innerHTML = dots(screens[step]());
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
@@ -459,7 +461,7 @@ if (typeof document !== "undefined") (function () {
       if (yes) st.liked.push(CARDS[st.idx].siteId);
       st.idx++;
       save();
-      if (st.idx >= CARDS.length) { answered(2, st.liked.join(",") || "none"); go(3); } else render();
+      if (st.idx >= CARDS.length) { answered(2, "yes:" + st.liked.length + ",no:" + (CARDS.length - st.liked.length)); go(3); } else render();
     };
     if (reduced || !card) return done();
     card.style.transition = "transform .25s ease";

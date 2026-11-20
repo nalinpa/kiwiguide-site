@@ -7,7 +7,7 @@ const KEYS = ["ad_storage", "ad_user_data", "ad_personalization", "analytics_sto
 
 function fakeWin(hostname) {
   const appended = [];
-  return { appended, location: { hostname }, document: { createElement: () => ({}), head: { appendChild: (s) => appended.push(s) } } };
+  return { appended, location: { hostname, origin: "https://" + hostname, pathname: "/plan/", search: "?x=1", hash: "#id_token=SECRET&state=abc" }, document: { createElement: () => ({}), head: { appendChild: (s) => appended.push(s) } } };
 }
 const calls = (w) => w.dataLayer.map((a) => Array.from(a));
 
@@ -53,7 +53,19 @@ test("consent defaults are queued before config and before the tag is added", ()
 });
 test("config has no debug flag on kiwiguide.app, debug_mode elsewhere", () => {
   const live = fakeWin("kiwiguide.app"); measureInit(GA_ID, live);
-  assert.deepEqual(calls(live).find((x) => x[0] === "config"), ["config", GA_ID]);
+  assert.deepEqual(calls(live).find((x) => x[0] === "config"), ["config", GA_ID, { page_location: "https://kiwiguide.app/plan/?x=1" }]);
   const test = fakeWin("test.example.workers.dev"); measureInit(GA_ID, test);
-  assert.deepEqual(calls(test).find((x) => x[0] === "config"), ["config", GA_ID, { debug_mode: true }]);
+  assert.deepEqual(calls(test).find((x) => x[0] === "config"), ["config", GA_ID, { page_location: "https://test.example.workers.dev/plan/?x=1", debug_mode: true }]);
+  ["www.kiwiguide.app", "kiwiguide.blacksands.app"].forEach((h) => { const w = fakeWin(h); measureInit(GA_ID, w); assert.equal(calls(w).find((x) => x[0] === "config")[2].debug_mode, undefined); });
+  const loc = fakeWin("localhost"); measureInit(GA_ID, loc); assert.equal(calls(loc).find((x) => x[0] === "config")[2].debug_mode, true);
+});
+test("page_location never has a hash, so a Google return token never reaches analytics", () => {
+  const w = fakeWin("kiwiguide.app"); measureInit(GA_ID, w);
+  assert.ok(!JSON.stringify(calls(w)).includes("#"));
+  assert.ok(!JSON.stringify(calls(w)).includes("SECRET"));
+});
+test("quiz.js loads and its functions run with no global track", () => {
+  assert.equal(typeof globalThis.track, "undefined");
+  const Q = createRequire(import.meta.url)("../public/plan/quiz.js");
+  assert.equal(typeof Q.stepFromHash, "function");
 });

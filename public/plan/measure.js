@@ -3,7 +3,7 @@
 
 var GA_ID = "G-BVVBTV575Q";
 var GA_PLACEHOLDER = "G-XXXXXXXXXX";
-var GA_HOST = "kiwiguide.app";
+var GA_HOSTS = ["kiwiguide.app", "www.kiwiguide.app", "kiwiguide.blacksands.app"]; // live; any other host is a test copy
 // EU 27, Iceland, Liechtenstein, Norway, UK, Switzerland: analytics and ad storage start denied here.
 var CONSENT_DENIED_REGIONS = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "CH"];
 
@@ -31,7 +31,10 @@ function measureInit(id, win) {
   win.gtag("set", "url_passthrough", false);
   win.gtag("js", new Date());
   // test copies show in DebugView and can be filtered out of reports as developer traffic
-  if (win.location.hostname === GA_HOST) win.gtag("config", id); else win.gtag("config", id, { debug_mode: true });
+  // page_location never carries the hash: the Google sign-in return puts a token there
+  var cfg = { page_location: win.location.origin + win.location.pathname + win.location.search };
+  if (GA_HOSTS.indexOf(win.location.hostname) < 0) cfg.debug_mode = true;
+  win.gtag("config", id, cfg);
   var s = win.document.createElement("script");
   s.async = true;
   s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(id);

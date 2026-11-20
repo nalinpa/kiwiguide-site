@@ -167,6 +167,8 @@ function strongInterests(likedCardIds) {
   return top;
 }
 
+// A stop's picture: its own photo, else the app's default for it (self-hosted), else "".
+function stopPhoto(i) { return i.thumb || (i.fallback ? "/img/places/" + i.fallback + ".webp" : ""); }
 function plainStop(i) { return i.thumb && i.category.indexOf("Food") < 0 && i.category.indexOf("Stay") < 0; }
 // A card photo for each trip: a stop that is not Food or Stay, from day 2 on when there is one, and not one an earlier card used.
 // Falls back to any such stop, then any stop with a photo, then "" (a plain tile).
@@ -177,7 +179,7 @@ function tripPhotos(list) {
     var items = [];
     days.forEach(function (d) { items = items.concat(d.items); });
     var pick = items.filter(function (i) { return plainStop(i) && !used[i.thumb]; })[0] || items.filter(plainStop)[0] || items.filter(function (i) { return i.thumb; })[0];
-    if (!pick) return "";
+    if (!pick) { pick = items.filter(stopPhoto)[0]; return pick ? stopPhoto(pick) : ""; }
     used[pick.thumb] = true;
     return pick.thumb;
   });
@@ -231,7 +233,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, strongInterests: strongInterests, tripPhotos: tripPhotos, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState };
+  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, strongInterests: strongInterests, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState };
 }
 
 // ---- the page ----
@@ -356,7 +358,7 @@ if (typeof document !== "undefined") (function () {
             d.items.map(function (i) {
               var m = stopMatches(i, interests);
               return '<li class="q-stop' + (m ? " q-liked" : "") + '">' +
-                (i.thumb ? '<img src="' + esc(i.thumb) + '" alt="" width="56" height="56" loading="lazy">' : '<span class="q-noimg">' + esc(i.category[0] || "") + "</span>") +
+                (stopPhoto(i) ? '<img src="' + esc(stopPhoto(i)) + '" alt="" width="56" height="56" loading="lazy">' : '<span class="q-noimg">' + esc(i.category[0] || "") + "</span>") +
                 "<div><p>" + esc(i.siteName) + "</p><small>" + esc(i.timeLabel + " · " + i.durationLabel) + "</small></div>" + (m ? '<b class="q-youliked">You liked</b>' : "") + "</li>";
             }).join("") + "</ul></section>";
         }).join("") + "</div>" +

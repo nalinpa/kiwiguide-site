@@ -152,3 +152,10 @@ test("dots: no middle dot survives into a rendered screen", () => {
   const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
   assert.ok(src.includes("root.innerHTML = dots(screens[step]())"), "render passes every screen through dots");
 });
+
+test("a stop with no photo gets its fallback URL; a real photo wins", () => {
+  assert.equal(Q.stopPhoto({ thumb: null, fallback: "types/coffee" }), "/img/places/types/coffee.webp");
+  assert.equal(Q.stopPhoto({ thumb: "a.webp", fallback: "types/coffee" }), "a.webp");
+  assert.equal(Q.stopPhoto({ thumb: null }), "");
+  assert.deepEqual(Q.tripPhotos([{ days: [{ items: [{ thumb: null, fallback: "categories/Food", category: ["Food"] }] }] }]), ["/img/places/categories/Food.webp"]);
+});

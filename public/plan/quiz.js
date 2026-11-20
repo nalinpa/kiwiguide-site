@@ -66,10 +66,10 @@ var INTEREST_ORDER = ["hikes", "food", "scenic", "adventure"];
 var INTEREST_NAMES = { hikes: ["hike or nature stop", "hikes and nature stops"], food: ["food stop", "food stops"], scenic: ["scenic stop", "scenic stops"], adventure: ["adventure", "adventures"] };
 
 var SEASONS = [
-  { id: "summer", label: "Summer", hint: "December to February", months: [11, 0, 1], line: "Summer: book the popular stays and cruises early. It’s the busiest time of year." },
-  { id: "autumn", label: "Autumn", hint: "March to May", months: [2, 3, 4], line: "Autumn: quieter roads and gold trees in Central Otago. Nights get cold." },
-  { id: "winter", label: "Winter", hint: "June to August", months: [5, 6, 7], line: "Winter: check the passes for snow before you drive, and carry chains." },
-  { id: "spring", label: "Spring", hint: "September to November", months: [8, 9, 10], line: "Spring: lambs and long days. Some walks close for lambing." },
+  { id: "summer", feel: "Warm days for swimming and long evenings. Peak season, so book ahead.", label: "Summer", hint: "December to February", months: [11, 0, 1], line: "Summer: book the popular stays and cruises early. It’s the busiest time of year." },
+  { id: "autumn", feel: "Quieter roads, settled weather and gold trees in Central Otago.", label: "Autumn", hint: "March to May", months: [2, 3, 4], line: "Autumn: quieter roads and gold trees in Central Otago. Nights get cold." },
+  { id: "winter", feel: "Snow on the mountains and the ski fields. Cold nights, and some passes close.", label: "Winter", hint: "June to August", months: [5, 6, 7], line: "Winter: check the passes for snow before you drive, and carry chains." },
+  { id: "spring", feel: "Lambs, waterfalls in full flow and fewer crowds. The weather changes fast.", label: "Spring", hint: "September to November", months: [8, 9, 10], line: "Spring: lambs and long days. Some walks close for lambing." },
 ];
 var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -260,9 +260,9 @@ if (typeof document !== "undefined") (function () {
     },
     3: function () {
       var n = interestsFrom(st.liked).length;
-      return '<p class="q-kicker">' + (n ? "Nice. " + n + (n === 1 ? " thing" : " things") + " you’re into, noted." : "Noted.") + '</p><h1 tabindex="-1">When are you coming?</h1><p class="q-lead">Seasons are flipped down here: a New Zealand summer is December to February.</p>' +
-        SEASONS.map(function (s) { return choice(s.label, s.hint + ", NZ " + s.label.toLowerCase(), "season", s.id); }).join("") +
-        choice("Not sure yet", "Set your dates later in the app", "season", "unsure");
+      return '<p class="q-kicker">' + (n ? "Nice. " + n + (n === 1 ? " thing" : " things") + " you’re into, noted." : "Noted.") + '</p><h1 tabindex="-1">Which NZ season are you picking?</h1><p class="q-lead">Southern hemisphere seasons!</p>' +
+        SEASONS.map(function (s) { return choice(s.label, s.hint + ". " + s.feel, "season", s.id); }).join("") +
+        choice("Not sure yet", "Set your dates later in the app.", "season", "unsure");
     },
     4: function () {
       var s = SEASONS.filter(function (x) { return x.id === st.season; })[0];

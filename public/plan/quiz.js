@@ -250,6 +250,8 @@ if (typeof document !== "undefined") (function () {
   function blank() { return { start: null, band: null, idx: 0, liked: [], season: null, month: null, pick: null }; }
   var st = blank();
   try { var saved = JSON.parse(sessionStorage.getItem(KEY)); if (saved && typeof saved === "object") st = saved; } catch (e) { /* works without it */ }
+  var started = !!st.start, revealed = ""; // events (measure.js): quiz_start once per visit, quiz_reveal once per set of trips offered
+  function answered(step, answer) { track("quiz_step", { step: step, answer: answer }); }
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 
   var SAVED = "kg-saved";
@@ -430,6 +432,7 @@ if (typeof document !== "undefined") (function () {
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
     if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
+    if ((step === 5 || step === 6)) { var offered = tripList().map(function (t) { return t.key; }).join(","); if (offered !== revealed) { revealed = offered; track("quiz_reveal", { trips: offered }); } }
     root.innerHTML = dots(screens[step]());
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
@@ -456,7 +459,7 @@ if (typeof document !== "undefined") (function () {
       if (yes) st.liked.push(CARDS[st.idx].siteId);
       st.idx++;
       save();
-      if (st.idx >= CARDS.length) go(3); else render();
+      if (st.idx >= CARDS.length) { answered(2, st.liked.join(",") || "none"); go(3); } else render();
     };
     if (reduced || !card) return done();
     card.style.transition = "transform .25s ease";
@@ -503,17 +506,18 @@ if (typeof document !== "undefined") (function () {
   }
 
   root.addEventListener("click", function (e) {
+    if (e.target.closest("a.badge")) track("app_store_click", { trip: st.pick });
     stopHint();
     var b = e.target.closest("[data-act]");
     if (!b || g.busy()) return;
     var act = b.getAttribute("data-act"), v = b.getAttribute("data-val");
-    if (act === "start") { st = Object.assign(blank(), { start: v }); save(); go(1); }
-    else if (act === "band") { st.band = v; st.idx = 0; st.liked = []; st.season = null; st.month = null; st.pick = null; save(); go(2); }
+    if (act === "start") { if (!started) { started = true; track("quiz_start"); } answered(0, v); st = Object.assign(blank(), { start: v }); save(); go(1); }
+    else if (act === "band") { answered(1, v); st.band = v; st.idx = 0; st.liked = []; st.season = null; st.month = null; st.pick = null; save(); go(2); }
     else if (act === "yes") decide(true);
     else if (act === "no") decide(false);
-    else if (act === "season") { st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? 5 : 4); }
-    else if (act === "month") { var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(5); }
-    else if (act === "pick") { st.pick = v; save(); go(6); }
+    else if (act === "season") { answered(3, v); st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? 5 : 4); }
+    else if (act === "month") { answered(4, v || "none"); var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(5); }
+    else if (act === "pick") { answered(5, v); st.pick = v; save(); go(6); }
     else if (act === "again") { st = blank(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(0); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(7); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
@@ -570,6 +574,7 @@ if (typeof document !== "undefined") (function () {
   }
   function afterSave(r) {
     if (r.result === "has-trip") { acct.note = "has-trip"; acct.existing = r.existing; acct.error = ""; return render(); }
+    track("trip_saved", { trip: st.pick, replaced: false });
     finish(session.email, thisTrip().label);
   }
   function doSave() {
@@ -578,7 +583,7 @@ if (typeof document !== "undefined") (function () {
   }
   function doReplace() {
     acct.error = "";
-    run(function () { return replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()); }, function () { finish(session.email, thisTrip().label); });
+    run(function () { return replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()); }, function () { track("trip_saved", { trip: st.pick, replaced: true }); finish(session.email, thisTrip().label); });
     // buttons are off while it runs; say so (a failure re-renders a fresh dialog, success leaves the screen)
     var dlg = document.getElementById("q-dialog"), rb = root.querySelector("[data-act=replace]");
     if (g.busy() && dlg && rb) { dlg.setAttribute("aria-busy", "true"); rb.textContent = "Replacing…"; }
@@ -605,6 +610,7 @@ if (typeof document !== "undefined") (function () {
     }
     run(function () {
       return (acct.mode === "signin" ? signIn(net, email, passEl.value) : createAccount(net, email, passEl.value, document.getElementById("q-pass2").value)).then(function (s) {
+        if (acct.mode === "create") track("sign_up", { method: "email" });
         session = s;
         return saveFlow(net, s.idToken, newBody());
       });
@@ -624,6 +630,7 @@ if (typeof document !== "undefined") (function () {
     var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…"; // render left it empty, so the change is announced; fail() clears it
     run(function () {
       return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
+        if (s.isNew) track("sign_up", { method: "google" });
         session = s;
         return saveFlow(net, s.idToken, newBody());
       });

@@ -147,6 +147,42 @@ function startDateFor(answer, today) {
   return iso(m.year, m.month, 1);
 }
 
+// One separator everywhere: a dot with a space each side. Every screen is written with " · " and swapped for this on render,
+// because Overpass draws its middle dot (U+00B7) off to the left, so it reads as "·a"; U+2219 is centred.
+var SEP = " ∙ ";
+
+// The interests to highlight: the top-counted one(s) among the yes swipes, plus the runner-up if it is within one.
+// Liking every card says nothing, so it highlights nothing.
+function strongInterests(likedCardIds) {
+  if (likedCardIds.length >= CARDS.length) return [];
+  var n = {};
+  likedCardIds.forEach(function (id) {
+    CARDS.forEach(function (c) { if (c.siteId === id) c.likes.forEach(function (i) { n[i] = (n[i] || 0) + 1; }); });
+  });
+  var ranked = INTEREST_ORDER.filter(function (i) { return n[i]; }).sort(function (a, b) { return n[b] - n[a]; });
+  if (!ranked.length) return [];
+  var top = ranked.filter(function (i) { return n[i] === n[ranked[0]]; });
+  var rest = ranked.filter(function (i) { return top.indexOf(i) < 0; });
+  if (top.length === 1 && rest.length && n[rest[0]] >= n[top[0]] - 1) top.push(rest[0]);
+  return top;
+}
+
+function plainStop(i) { return i.thumb && i.category.indexOf("Food") < 0 && i.category.indexOf("Stay") < 0; }
+// A card photo for each trip: a stop that is not Food or Stay, from day 2 on when there is one, and not one an earlier card used.
+// Falls back to any such stop, then any stop with a photo, then "" (a plain tile).
+function tripPhotos(list) {
+  var used = {};
+  return list.map(function (t) {
+    var days = t.days.length > 1 ? t.days.slice(1).concat(t.days.slice(0, 1)) : t.days;
+    var items = [];
+    days.forEach(function (d) { items = items.concat(d.items); });
+    var pick = items.filter(function (i) { return plainStop(i) && !used[i.thumb]; })[0] || items.filter(plainStop)[0] || items.filter(function (i) { return i.thumb; })[0];
+    if (!pick) return "";
+    used[pick.thumb] = true;
+    return pick.thumb;
+  });
+}
+
 // Coming back to a finished deck keeps the swipes: the last card shows again, and its yes (if any) is taken back.
 function reopenDeck(idx, liked) {
   if (idx < CARDS.length) return { idx: idx, liked: liked };
@@ -192,7 +228,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, firstOpenStep: firstOpenStep, cleanState: cleanState };
+  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, strongInterests: strongInterests, tripPhotos: tripPhotos, SEP: SEP, firstOpenStep: firstOpenStep, cleanState: cleanState };
 }
 
 // ---- the page ----
@@ -202,7 +238,7 @@ if (typeof document !== "undefined") (function () {
   var root = document.getElementById("q");
   var bar = document.getElementById("bar");
   var backBtn = document.getElementById("back");
-  var PROGRESS = [8, 22, 40, 58, 70, 84, 100];
+  var PROGRESS = [8, 22, 40, 58, 70, 80, 88, 94, 100];
   var trips = null;
   var busy = false;
   var keyHandler = null;
@@ -288,11 +324,10 @@ if (typeof document !== "undefined") (function () {
     },
     5: function () {
       var band = BANDS.filter(function (b) { return b.id === st.band; })[0];
-      var list = tripList();
+      var list = tripList(), photos = tripPhotos(list);
       return '<p class="q-kicker">' + list.length + " trips fit " + townName(st.start) + " · " + band.label.toLowerCase() + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
-        list.map(function (t) {
-          var thumb = "";
-          t.days.some(function (d) { return d.items.some(function (i) { if (i.thumb) { thumb = i.thumb; return true; } return false; }); });
+        list.map(function (t, n) {
+          var thumb = photos[n];
           var route = t.description.length > 110 ? t.description.slice(0, 110).replace(/\s+\S*$/, "") + "…" : t.description;
           var ends = t.ends === townName(st.start) ? "Back in " + t.ends : "Ends in " + t.ends;
           return '<button type="button" class="q-trip" data-act="pick" data-val="' + esc(t.key) + '">' + (thumb ? '<img src="' + esc(thumb) + '" alt="" width="640" height="240">' : "") +
@@ -301,7 +336,7 @@ if (typeof document !== "undefined") (function () {
     },
     6: function () {
       var t = trips.filter(function (x) { return x.key === st.pick; })[0];
-      var interests = interestsFrom(st.liked);
+      var interests = strongInterests(st.liked);
       var line = matchLine(matchCounts(t, interests));
       var when = st.month ? MONTH_NAMES[st.month.month] + " " + st.month.year : st.season && st.season !== "unsure" ? SEASONS.filter(function (s) { return s.id === st.season; })[0].label : "";
       var sline = seasonLine(st.season);
@@ -361,10 +396,29 @@ if (typeof document !== "undefined") (function () {
     },
   };
 
+  // The one-time nudge on card 1 (right, then left). Anything the visitor does cancels it.
+  var HINT = "kg-hint", hintTimer = null, hintAnims = [];
+  function stopHint() { clearTimeout(hintTimer); hintAnims.forEach(function (a) { a.cancel(); }); hintAnims = []; }
+  function startHint(card, yes, no) {
+    var seen = false;
+    try { seen = !!sessionStorage.getItem(HINT); } catch (e) { /* shows each time */ }
+    if (seen || reduced || st.idx !== 0 || !card.animate) return;
+    hintTimer = setTimeout(function () {
+      try { sessionStorage.setItem(HINT, "1"); } catch (e) { /* fine */ }
+      var o = { duration: 1500, easing: "ease-in-out" };
+      hintAnims = [
+        card.animate([{ transform: "none" }, { transform: "translateX(40px) rotate(2.2deg)", offset: 0.17 }, { transform: "none", offset: 0.4 }, { transform: "translateX(-40px) rotate(-2.2deg)", offset: 0.62 }, { transform: "none", offset: 0.85 }, { transform: "none" }], o),
+        yes.animate([{ opacity: 0 }, { opacity: 0.6, offset: 0.17 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }], o),
+        no.animate([{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 0.6, offset: 0.62 }, { opacity: 0, offset: 0.85 }, { opacity: 0 }], o),
+      ];
+    }, 400);
+  }
+
   function removeKeys() { if (keyHandler) { document.removeEventListener("keydown", keyHandler); keyHandler = null; } }
 
   function render() {
     removeKeys();
+    stopHint();
     busy = false;
     var step = stepFromHash(location.hash);
     var ok = lowestValid(step);
@@ -373,7 +427,7 @@ if (typeof document !== "undefined") (function () {
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
     if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
-    root.innerHTML = screens[step]();
+    root.innerHTML = screens[step]().split(" · ").join(SEP);
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
     backBtn.hidden = step === 0 || step === 8;
@@ -412,6 +466,7 @@ if (typeof document !== "undefined") (function () {
     var x0 = 0, dx = 0, drag = false;
     var yes = document.getElementById("stamp-yes"), no = document.getElementById("stamp-no");
     card.addEventListener("pointerdown", function (e) {
+      stopHint();
       if (busy) return;
       drag = true; x0 = e.clientX; dx = 0; card.style.transition = "none";
       try { card.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
@@ -435,14 +490,17 @@ if (typeof document !== "undefined") (function () {
     card.addEventListener("pointerup", end);
     card.addEventListener("pointercancel", end);
     keyHandler = function (e) {
+      stopHint();
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === "ArrowRight") decide(true);
       else if (e.key === "ArrowLeft") decide(false);
     };
     document.addEventListener("keydown", keyHandler);
+    startHint(card, yes, no);
   }
 
   root.addEventListener("click", function (e) {
+    stopHint();
     var b = e.target.closest("[data-act]");
     if (!b || g.busy()) return;
     var act = b.getAttribute("data-act"), v = b.getAttribute("data-val");
@@ -560,7 +618,7 @@ if (typeof document !== "undefined") (function () {
   function finishGoogle() {
     var net = fetch.bind(window), r = gret, sv = gsaved;
     gret = gsaved = null;
-    setTimeout(function () { var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…"; }, 0); // next tick, so screen readers announce it
+    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…"; // render left it empty, so the change is announced; fail() clears it
     run(function () {
       return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
         session = s;

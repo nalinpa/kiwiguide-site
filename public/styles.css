@@ -400,7 +400,7 @@ footer .brand { text-decoration: none; }
 .reset [hidden] { display: none; }
 
 /* Trip quiz (/plan/) */
-.quiz { overflow-x: clip; display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 520px; margin-inline: auto; }
+.quiz { touch-action: manipulation; overflow-x: clip; display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 520px; margin-inline: auto; }
 .q-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; flex-shrink: 0; }
 .q-back { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .q-back[hidden] { display: none; }
@@ -411,6 +411,7 @@ footer .brand { text-decoration: none; }
 .q-main h1 { margin: 0 0 8px; font-size: clamp(1.75rem, 7vw, 2.1rem); line-height: 1.15; }
 .q-main h1:focus { outline: none; }
 .q-kicker { margin: 0; font-size: 0.9375rem; font-weight: 600; color: var(--muted); }
+.q-main > :not(.q-deck) { flex-shrink: 0; }
 .q-lead { margin: 4px 0 0; font-weight: 600; line-height: 1.4; }
 .q-btn, .q-trip, .q-town { font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .q-btn { display: block; width: 100%; min-height: 56px; padding: 14px 18px; border: 2px solid var(--line); border-radius: 14px; background: var(--bar); font-weight: 600; font-size: 1.0625rem; }
@@ -507,4 +508,5 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
 .q-google:disabled { opacity: 0.6; cursor: default; }
 .q-or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--muted); font-size: 0.875rem; }
 .q-or::before, .q-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.q-status { margin: 0; min-height: 0; text-align: center; color: var(--muted); font-weight: 600; }
+.q-status:empty { display: none; }
+.q-status { margin: 0; text-align: center; color: var(--muted); font-weight: 600; }

@@ -119,3 +119,28 @@ test("firstOpenStep: season and later need a finished deck", () => {
   assert.equal(Q.firstOpenStep({ ...st, idx: 8 }, 3), 3);
   assert.equal(Q.firstOpenStep({ ...st, start: null }, 3), 0);
 });
+
+test("strongInterests: the top interest and a runner-up within one; all yes highlights nothing", () => {
+  assert.deepEqual(Q.strongInterests([]), []);
+  // adventure x2 (shotover, nevis), hikes x1, scenic x1: top adventure, runner-up the first of the rest in order (hikes)
+  assert.deepEqual(Q.strongInterests(["shotover-jet", "nevis-bungy", "hooker-valley-track", "cruise-milford-small-boat-cruise"]), ["adventure", "hikes"]);
+  // hikes x3 vs food x1: food is two behind, so only hikes
+  assert.deepEqual(Q.strongInterests(["hooker-valley-track", "te-anau-glowworm-caves", "pancake-rocks-and-blowholes-walk", "redcliff-te-anau"]), ["hikes"]);
+  // a tie at the top keeps both and no runner-up
+  assert.deepEqual(Q.strongInterests(["hooker-valley-track", "redcliff-te-anau"]), ["hikes", "food"]);
+  assert.deepEqual(Q.strongInterests(CARDS.map((c) => c.siteId)), []);
+});
+
+test("tripPhotos: a different photo for each trip, never Food, from day 2 on", () => {
+  const stop = (id, thumb, category = ["Scenic"]) => ({ siteId: id, thumb, category });
+  const a = { days: [{ items: [stop("g", "g.webp")] }, { items: [stop("r", "r.webp", ["Food"]), stop("x", "x.webp")] }] };
+  const b = { days: [{ items: [stop("g", "g.webp")] }, { items: [stop("x", "x.webp"), stop("y", "y.webp")] }] };
+  assert.deepEqual(Q.tripPhotos([a, b]), ["x.webp", "y.webp"]);
+  // the same first stop, the only photo: falls back rather than going blank
+  const one = { days: [{ items: [stop("g", "g.webp")] }] };
+  assert.deepEqual(Q.tripPhotos([one, one]), ["g.webp", "g.webp"]);
+  assert.deepEqual(Q.tripPhotos([{ days: [{ items: [stop("n", null)] }] }]), [""]);
+  assert.deepEqual(Q.tripPhotos([{ days: [{ items: [stop("f", "f.webp", ["Food"])] }] }]), ["f.webp"]);
+  const q = tripsFor(trips, "queenstown", "weekend"), p = Q.tripPhotos(q);
+  assert.equal(new Set(p).size, p.length);
+});

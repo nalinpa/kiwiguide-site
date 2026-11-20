@@ -215,7 +215,8 @@ if (typeof document !== "undefined") (function () {
 
   var SAVED = "kg-saved";
   var session = null; // { idToken, email }: in memory only, never stored
-  var acct = { mode: "create", error: "", note: "", existing: null };
+  var acct = { mode: "create", error: "", note: "", existing: null, email: "" };
+  var g = guard(); // one sign-in, save or replace at a time
   function savedInfo() { try { var d = JSON.parse(sessionStorage.getItem(SAVED)); if (d && typeof d.email === "string" && typeof d.title === "string") return d; } catch (e) { /* none */ } return null; }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -313,21 +314,25 @@ if (typeof document !== "undefined") (function () {
     7: function () {
       var t = trips.filter(function (x) { return x.key === st.pick; })[0];
       var kicker = '<p class="q-kicker">' + esc(t.label) + "</p>";
-      if (acct.note === "has-trip") {
-        var x = acct.existing;
-        return kicker + '<h1 tabindex="-1">Replace your trip?</h1><p class="q-lead">You already have a trip: ' + esc(x.title || "Your trip") + (tripDates(x.startDate, x.endDate) ? ", " + esc(tripDates(x.startDate, x.endDate)) : "") + ". Replace it with this one?</p>" +
-          '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + '</p><div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace my trip</button><button type="button" class="q-again" data-act="keep">Keep my trip</button></div>';
+      var dialog = "";
+      if (session && acct.note === "has-trip") {
+        var x = acct.existing, dt = tripDates(x.startDate, x.endDate);
+        dialog = '<dialog class="q-dialog" id="q-dialog" aria-labelledby="q-dlg-h"><h2 id="q-dlg-h">Your account already has a trip</h2><p>This will replace your current trip.</p>' +
+          '<p class="q-small">' + esc((x.title || "Your trip") + (dt ? " · " + dt : "")) + '</p><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
+          '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace it</button><button type="button" class="q-again" id="q-keep" data-act="keep" autofocus>Keep my trip</button></div></dialog>';
       }
       if (session) {
-        return kicker + '<h1 tabindex="-1">Save your trip</h1><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + '</p>' +
-          '<button type="button" class="q-cta" data-act="retry">Try again</button>';
+        return kicker + '<h1 tabindex="-1">Save your trip</h1><p class="q-lead">Saving to ' + esc(session.email) + ".</p>" +
+          (acct.note === "has-trip" ? "" : '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>") +
+          '<button type="button" class="q-cta" data-act="retry">' + (acct.error ? "Try again" : "Save trip") + "</button>" + dialog;
       }
       var mode = acct.mode;
       var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in to save your trip" : "Save your trip";
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
+      var dby = ' aria-describedby="q-err"';
       return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + "</p>" +
-        '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required></label>' +
-        (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required></label>') +
+        '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
+        (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required' + dby + "></label>") +
         '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
         '<button type="submit" class="q-cta" id="q-go">' + (mode === "forgot" ? "Send reset email" : mode === "signin" ? "Sign in" : "Create account") + "</button></form>" +
         '<p class="q-alt">' + (mode === "create" ? 'Already have one? <button type="button" class="q-link" data-act="mode" data-val="signin">Sign in</button>' :
@@ -359,13 +364,18 @@ if (typeof document !== "undefined") (function () {
     root.innerHTML = screens[step]();
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
-    backBtn.hidden = step === 0;
+    backBtn.hidden = step === 0 || step === 8;
     root.scrollTop = 0;
     window.scrollTo(0, 0);
     var h = root.querySelector("h1");
     if (h) h.focus({ preventScroll: true });
     if (step === 2) setupDeck();
-    if (step === 7) { var f = document.getElementById("q-email"); if (f) f.focus({ preventScroll: true }); }
+    if (step === 7) {
+      var f = document.getElementById("q-email");
+      if (f) { f.value = acct.email; f.focus({ preventScroll: true }); }
+      var dlg = document.getElementById("q-dialog");
+      if (dlg) { dlg.showModal(); document.getElementById("q-keep").focus(); }
+    }
   }
 
   function decide(yes) {
@@ -421,7 +431,7 @@ if (typeof document !== "undefined") (function () {
 
   root.addEventListener("click", function (e) {
     var b = e.target.closest("[data-act]");
-    if (!b) return;
+    if (!b || g.busy()) return;
     var act = b.getAttribute("data-act"), v = b.getAttribute("data-val");
     if (act === "start") { st = Object.assign(blank(), { start: v }); save(); go(1); }
     else if (act === "band") { st.band = v; st.idx = 0; st.liked = []; st.season = null; st.month = null; st.pick = null; save(); go(2); }
@@ -430,50 +440,88 @@ if (typeof document !== "undefined") (function () {
     else if (act === "season") { st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? 5 : 4); }
     else if (act === "month") { var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(5); }
     else if (act === "pick") { st.pick = v; save(); go(6); }
-    else if (act === "again") { st = blank(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(0); }
+    else if (act === "again") { st = blank(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(0); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(7); }
-    else if (act === "mode") { acct.mode = v; acct.error = ""; render(); }
+    else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "retry") doSave();
     else if (act === "replace") doReplace();
-    else if (act === "keep") finish(acct.existing.title || "Your trip", true);
+    else if (act === "keep") keepIt();
   });
 
-  function setErr(text) { var e = document.getElementById("q-err"); if (e) e.textContent = text; }
+  // The page's own error is shown in #q-err; field is the input at fault.
+  function setErr(text, field, ok) {
+    var e = document.getElementById("q-err");
+    if (e) { e.textContent = text; e.className = "q-error" + (ok ? " q-ok" : ""); }
+    ["q-email", "q-pass"].forEach(function (id) {
+      var i = document.getElementById(id);
+      if (i) { if (field === id && !ok) i.setAttribute("aria-invalid", "true"); else i.removeAttribute("aria-invalid"); }
+    });
+  }
+  function setDisabled(b) { Array.prototype.forEach.call(root.querySelectorAll("button"), function (x) { x.disabled = b; }); }
+  function fieldFor(code) {
+    var c = String(code || "").split(/[\s:]/)[0];
+    return c === "EMAIL_EXISTS" || c === "INVALID_EMAIL" ? "q-email" : c === "WEAK_PASSWORD" || c === "INVALID_LOGIN_CREDENTIALS" || c === "INVALID_PASSWORD" || c === "EMAIL_NOT_FOUND" ? "q-pass" : null;
+  }
   function thisTrip() { return trips.filter(function (x) { return x.key === st.pick; })[0]; }
   function newBody() { return tripBody(thisTrip(), startDateFor(st, new Date()), function () { return crypto.randomUUID(); }); }
-  function fail(err) { acct.error = saveErrorMessage(err && typeof err.status === "number" ? err.status : 0, err && err.error); render(); }
-  function finish(title, kept) {
-    try { sessionStorage.setItem(SAVED, JSON.stringify({ email: session.email, title: title, kept: !!kept })); } catch (e) { /* the screen still shows this time */ }
+  function finish(email, title, kept) {
+    try { sessionStorage.setItem(SAVED, JSON.stringify({ email: email, title: title, kept: !!kept })); } catch (e) { /* the screen still shows this time */ }
     session = null;
     go(8);
   }
 
+  // Every failure ends in a re-render or a re-enabled form, never a stuck disabled button.
+  function fail(err) {
+    if (err && typeof err.code === "string") { setDisabled(false); var m = authErrorMessage(err.code); setErr(m, fieldFor(err.code)); return; }
+    if (err && err.status === 401) {
+      acct = { mode: "signin", error: saveErrorMessage(401), note: "", existing: null, email: session ? session.email : "" };
+      session = null; return render();
+    }
+    if (session) { acct.error = err && typeof err.status === "number" ? saveErrorMessage(err.status, err.error) : authErrorMessage(""); return render(); }
+    setDisabled(false); setErr(authErrorMessage(""));
+  }
+  // fn returns a promise; only one runs at a time, and every button is off while it does.
+  function run(fn, onOk) {
+    var p = g.run(fn);
+    if (!p) return;
+    setDisabled(true);
+    p.then(onOk).catch(fail);
+  }
+  function afterSave(r) {
+    if (r.result === "has-trip") { acct.note = "has-trip"; acct.existing = r.existing; acct.error = ""; return render(); }
+    finish(session.email, thisTrip().label);
+  }
   function doSave() {
     acct.error = "";
-    saveFlow(fetch.bind(window), session.idToken, newBody()).then(function (r) {
-      if (r.result === "has-trip") { acct.note = "has-trip"; acct.existing = r.existing; return render(); }
-      finish(thisTrip().label);
-    }, fail);
+    run(function () { return saveFlow(fetch.bind(window), session.idToken, newBody()); }, afterSave);
   }
   function doReplace() {
     acct.error = "";
-    replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()).then(function () { finish(thisTrip().label); }, fail);
+    run(function () { return replaceTrip(fetch.bind(window), session.idToken, acct.existing.id, newBody()); }, function () { finish(session.email, thisTrip().label); });
   }
+  function keepIt() { if (!g.busy()) finish(session.email, acct.existing.title || "Your trip", true); }
+
+  // Escape on the dialog means Keep (cancel does not bubble, so listen while it goes down).
+  root.addEventListener("cancel", function (e) { e.preventDefault(); keepIt(); }, true);
 
   root.addEventListener("submit", function (e) {
     e.preventDefault();
+    if (g.busy()) return;
     var email = document.getElementById("q-email").value.trim();
     var passEl = document.getElementById("q-pass");
-    var btn = document.getElementById("q-go");
-    if (!email || (passEl && !passEl.value)) return setErr("Enter your " + (passEl ? "email and password." : "email."));
-    btn.disabled = true;
-    var done = function () { btn.disabled = false; };
+    if (!email) return setErr("Enter your email.", "q-email");
+    if (passEl && !passEl.value) return setErr("Enter your password.", "q-pass");
+    acct.email = email;
+    var net = fetch.bind(window);
     if (acct.mode === "forgot") {
-      return resetPassword(fetch.bind(window), email).then(function () { done(); setErr("If that email has an account, a reset link is on its way."); }, function (err) { done(); setErr(authErrorMessage(err && err.code)); });
+      return run(function () { return resetPassword(net, email); }, function () { setDisabled(false); setErr("If that email has an account, a reset link is on its way.", null, true); });
     }
-    (acct.mode === "signin" ? signIn : signUp)(fetch.bind(window), email, passEl.value).then(function (s) {
-      session = s; doSave();
-    }, function (err) { done(); setErr(authErrorMessage(err && err.code)); });
+    run(function () {
+      return (acct.mode === "signin" ? signIn : signUp)(net, email, passEl.value).then(function (s) {
+        session = s;
+        return saveFlow(net, s.idToken, newBody());
+      });
+    }, afterSave);
   });
 
   backBtn.addEventListener("click", function () {

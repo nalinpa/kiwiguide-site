@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 const A = createRequire(import.meta.url)("../public/plan/account.js");
-const { tripBody, authErrorMessage, saveErrorMessage, saveFlow, signUp, replaceTrip, tripDates } = A;
+const { tripBody, authErrorMessage, saveErrorMessage, saveFlow, signUp, replaceTrip, tripDates, guard } = A;
 const { trips } = JSON.parse(readFileSync(new URL("../public/plan/trips.json", import.meta.url), "utf8"));
 const ten = trips.find((t) => t.days.length === 10);
 let n = 0;
@@ -62,7 +62,7 @@ test("signUp sends returnSecureToken and returns the token; errors carry the cod
   await assert.rejects(signUp(bad, "a@b.co", "x"), (e) => e.code === "EMAIL_EXISTS");
 });
 
-test("retry after a failed save calls saveTrip again with the same idToken and never signUp", async () => {
+test("saveFlow: after a failed POST, calling it again reaches the api with the same Bearer token and no identitytoolkit call", async () => {
   let posts = 0;
   const f = fake((u, o) => {
     if (o.method === "POST") { posts++; if (posts === 1) throw new TypeError("network"); return res(200, { ok: true, data: { itinerary: {} } }); }
@@ -92,7 +92,7 @@ test("an account with a trip: confirm, then PUT to that trip's id, never POST", 
   assert.ok(f.calls.every((c) => c.opts.method !== "POST" && c.opts.method !== "DELETE"));
 });
 
-test("Keep my trip: no PUT, no POST", async () => {
+test("saveFlow with an existing trip only reads; nothing is written until replaceTrip is called", async () => {
   const f = withTrip(() => assert.fail("no write"));
   await saveFlow(f, "TOK", body); // the page then just shows the unchanged screen
   assert.deepEqual(f.calls.map((c) => c.opts.method), ["GET"]);
@@ -101,6 +101,32 @@ test("Keep my trip: no PUT, no POST", async () => {
 test("a 409 on replace carries the overlap error", async () => {
   const f = withTrip(() => res(409, { ok: false, error: "date_overlap" }));
   await assert.rejects(replaceTrip(f, "T", "trip1", body), (e) => e.status === 409 && saveErrorMessage(e.status, e.error).includes("overlap"));
+});
+
+test("saveFlow replaces the most recently updated trip, whatever the list order", async () => {
+  const list = [{ id: "old", updatedAt: "2027-01-01T00:00:00Z" }, { id: "new", updatedAt: "2027-02-01T00:00:00Z" }, { id: "mid", updatedAt: "2027-01-15T00:00:00Z" }];
+  const f = fake(() => res(200, { ok: true, data: { itineraries: list } }));
+  assert.equal((await saveFlow(f, "T", body)).existing.id, "new");
+});
+
+test("saveErrorMessage(401) asks them to sign in again", () => {
+  assert.equal(saveErrorMessage(401), "Please sign in again to save your trip.");
+});
+
+test("guard: a second call while one is pending is ignored; it works again after", async () => {
+  const g = guard();
+  let release, runs = 0;
+  const first = g.run(() => { runs++; return new Promise((r) => (release = r)); });
+  assert.equal(g.busy(), true);
+  assert.equal(g.run(() => { runs++; return Promise.resolve(); }), null);
+  release("a");
+  assert.equal(await first, "a");
+  assert.equal(g.busy(), false);
+  await g.run(() => { runs++; return Promise.reject(new Error("x")); }).catch(() => {});
+  assert.equal(g.busy(), false);
+  await g.run(() => { runs++; throw new Error("sync"); }).catch(() => {});
+  assert.equal(g.busy(), false);
+  assert.equal(runs, 3);
 });
 
 test("tripDates", () => {

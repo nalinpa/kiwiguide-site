@@ -78,11 +78,35 @@ function replaceTrip(fetchFn, idToken, id, body) {
   return api(fetchFn, idToken, "PUT", body, id).then(function () {});
 }
 
+function stamp(t) {
+  var u = t && t.updatedAt;
+  return typeof u === "number" ? u : Date.parse(u) || 0;
+}
+// Newest update first; the api already sorts that way, but the page does not rely on it.
+function newestFirst(list) {
+  return list.map(function (t, i) { return { t: t, i: i }; }).sort(function (a, b) { return stamp(b.t) - stamp(a.t) || a.i - b.i; }).map(function (x) { return x.t; });
+}
+
+// One write at a time: run() returns null while another call is pending, else the call's promise.
+function guard() {
+  var busy = false;
+  return {
+    busy: function () { return busy; },
+    run: function (fn) {
+      if (busy) return null;
+      busy = true;
+      var p;
+      try { p = Promise.resolve(fn()); } catch (e) { busy = false; return Promise.reject(e); }
+      return p.then(function (v) { busy = false; return v; }, function (e) { busy = false; throw e; });
+    },
+  };
+}
+
 // The app keeps one trip per person. No trip: save. A trip: hand it back so the page can ask before replacing it
 // (the list is newest-updated first, so the first one is the one to replace).
 function saveFlow(fetchFn, idToken, body) {
   return listTrips(fetchFn, idToken).then(function (existing) {
-    if (existing.length) return { result: "has-trip", existing: existing[0] };
+    if (existing.length) return { result: "has-trip", existing: newestFirst(existing)[0] };
     return saveTrip(fetchFn, idToken, body).then(function () { return { result: "saved" }; });
   });
 }
@@ -111,9 +135,10 @@ function authErrorMessage(code) {
 }
 
 function saveErrorMessage(status, error) {
+  if (status === 401) return "Please sign in again to save your trip.";
   if (status === 409 && error === "date_overlap") return "Those dates overlap your trip in Kiwi Guide. Go back and pick another month.";
   if (status === 0) return "No signal, so the trip was not saved. Your account is kept. Try again when you are back online.";
   return "The trip could not be saved. Your account is kept. Try again.";
 }
 
-if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };
+if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };

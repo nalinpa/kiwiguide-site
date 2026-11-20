@@ -57,6 +57,7 @@
   --accent: #a84a1a;
   --yes: #1b7f3b;
   --no: #c62828;
+  --err: #c62828;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -72,6 +73,7 @@
     --accent: #e8743b;
     --yes: #1d8340;
     --no: #d03030;
+    --err: #ff7b72;
     color-scheme: dark;
   }
 }
@@ -479,8 +481,15 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
 .q-form label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9375rem; font-weight: 600; }
 .q-form input { font: inherit; font-size: 1.0625rem; padding: 14px; border: 2px solid var(--line); border-radius: 12px; background: var(--bar); color: var(--ink); width: 100%; box-sizing: border-box; }
 .q-form input:focus-visible { outline: 3px solid var(--kiwi); outline-offset: 2px; }
-.q-error { margin: 0; min-height: 1.4em; color: var(--no); font-weight: 600; }
-.q-form .q-error { color: var(--ink); }
+.q-error { margin: 0; min-height: 1.4em; color: var(--err); font-weight: 600; }
+.q-error.q-ok { color: var(--ink); }
+.q-form input[aria-invalid="true"] { border-color: var(--err); }
+.q-dialog { width: min(92vw, 360px); padding: 24px 20px 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--bar); color: var(--ink); box-shadow: 0 12px 30px var(--shade-deep); }
+.q-dialog::backdrop { background: rgba(4, 22, 25, 0.6); }
+.q-dialog h2 { margin: 0 0 8px; font-size: 1.25rem; line-height: 1.25; }
+.q-dialog p { margin: 0 0 8px; }
+.q-dialog .q-small { font-size: 0.875rem; color: var(--muted); }
+.q-dialog .q-actions { margin-top: 12px; }
 .q-alt, .q-terms { margin: 0; text-align: center; }
 .q-terms { font-size: 0.8125rem; line-height: 1.45; color: var(--muted); margin-top: auto; }
 .q-link { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }

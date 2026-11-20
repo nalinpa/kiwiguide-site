@@ -147,7 +147,7 @@ function startDateFor(answer, today) {
   return iso(m.year, m.month, 1);
 }
 
-// One separator everywhere: a dot with a space each side. Every screen is written with " · " and swapped for this on render,
+// One separator everywhere: a dot with a space each side. Every screen is written with " · " and its dots swapped on render (see dots),
 // because Overpass draws its middle dot (U+00B7) off to the left, so it reads as "·a"; U+2219 is centred.
 var SEP = " ∙ ";
 
@@ -182,6 +182,9 @@ function tripPhotos(list) {
     return pick.thumb;
   });
 }
+
+// Every middle dot in a screen becomes the centred one (the font's own sits off to the left).
+function dots(html) { return html.split("·").join(SEP.trim()); }
 
 // Coming back to a finished deck keeps the swipes: the last card shows again, and its yes (if any) is taken back.
 function reopenDeck(idx, liked) {
@@ -228,7 +231,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, strongInterests: strongInterests, tripPhotos: tripPhotos, SEP: SEP, firstOpenStep: firstOpenStep, cleanState: cleanState };
+  module.exports = { BANDS: BANDS, bandsFor: bandsFor, tripsFor: tripsFor, CARDS: CARDS, interestsFrom: interestsFrom, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, matchCounts: matchCounts, matchLine: matchLine, INTEREST_CATEGORIES: INTEREST_CATEGORIES, stepFromHash: stepFromHash, reopenDeck: reopenDeck, strongInterests: strongInterests, tripPhotos: tripPhotos, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState };
 }
 
 // ---- the page ----
@@ -427,7 +430,7 @@ if (typeof document !== "undefined") (function () {
     if (step === 5 && ok === 5 && tripList().length === 1) { st.pick = tripList()[0].key; save(); location.replace("#6"); return; }
     if (step === 2 && ok === 2 && st.idx >= CARDS.length) { var r = reopenDeck(st.idx, st.liked); st.idx = r.idx; st.liked = r.liked; save(); }
     if (ok !== step) { location.replace("#" + ok); return; }
-    root.innerHTML = screens[step]().split(" · ").join(SEP);
+    root.innerHTML = dots(screens[step]());
     bar.style.width = PROGRESS[step] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[step]);
     backBtn.hidden = step === 0 || step === 8;
@@ -561,7 +564,7 @@ if (typeof document !== "undefined") (function () {
   // fn returns a promise; only one runs at a time, and every button is off while it does.
   function run(fn, onOk) {
     var p = g.run(fn);
-    if (!p) return;
+    if (!p) { var sb = document.getElementById("q-status"); if (sb) sb.textContent = ""; return; }
     setDisabled(true);
     p.then(onOk).catch(fail);
   }

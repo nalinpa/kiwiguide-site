@@ -144,3 +144,11 @@ test("tripPhotos: a different photo for each trip, never Food, from day 2 on", (
   const q = tripsFor(trips, "queenstown", "weekend"), p = Q.tripPhotos(q);
   assert.equal(new Set(p).size, p.length);
 });
+
+test("dots: no middle dot survives into a rendered screen", () => {
+  const out = Q.dots('<h2>Day 1 <span>· Queenstown</span></h2><p>3 days · Back in</p>');
+  assert.ok(!out.includes("·"));
+  assert.ok(out.includes("∙ Queenstown") && out.includes("3 days ∙ Back in"));
+  const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
+  assert.ok(src.includes("root.innerHTML = dots(screens[step]())"), "render passes every screen through dots");
+});

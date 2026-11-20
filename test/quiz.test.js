@@ -98,3 +98,24 @@ test("cleanState: bad answers are dropped with everything after them; a good sta
   assert.equal(Q.cleanState("junk", trips, NOV20).start, null);
   assert.equal(Q.cleanState({ ...good, liked: ["x"] }, trips, NOV20).band, "weekend");
 });
+
+test("cleanState: idx must be a number; names like constructor are not answers", () => {
+  const good = { start: "queenstown", band: "weekend", idx: 8, liked: [], season: "summer", month: null, pick: null };
+  const r = Q.cleanState({ ...good, idx: "3" }, trips, NOV20);
+  assert.equal(r.idx, 0); assert.equal(r.season, null); assert.equal(r.band, "weekend");
+  for (const bad of ["constructor", "__proto__", "toString"]) {
+    assert.equal(Q.cleanState({ ...good, start: bad }, trips, NOV20).start, null);
+    assert.equal(Q.cleanState({ ...good, band: bad }, trips, NOV20).band, null);
+    assert.equal(Q.cleanState({ ...good, season: bad }, trips, NOV20).season, null);
+    assert.equal(Q.cleanState({ ...good, pick: bad }, trips, NOV20).pick, null);
+  }
+});
+
+test("firstOpenStep: season and later need a finished deck", () => {
+  const st = { start: "queenstown", band: "weekend", idx: 3, liked: [], season: "summer", month: null, pick: null };
+  assert.equal(Q.firstOpenStep(st, 3), 2);
+  assert.equal(Q.firstOpenStep(st, 6), 2);
+  assert.equal(Q.firstOpenStep(st, 2), 2);
+  assert.equal(Q.firstOpenStep({ ...st, idx: 8 }, 3), 3);
+  assert.equal(Q.firstOpenStep({ ...st, start: null }, 3), 0);
+});

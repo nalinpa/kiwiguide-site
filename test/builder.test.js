@@ -32,6 +32,7 @@ const name = (a) => `${a.start} ${a.days}d ${a.drive} ${a.pace} food:${a.food}`;
 const stays = new Set(data.blocks.filter((b) => b.startTown === b.endTown).map((b) => b.startTown));
 
 const freeCap = (days) => Math.floor(days / 4);
+const foodOnly = (p) => p.category.length === 1 && p.category[0] === "Food";
 
 // A route of exactly `days` days within the drive limit, by the builder's rules: blocks within the limit,
 // each at most twice and never two days running; at most freeCap(days) free days, each in a town that has a
@@ -165,15 +166,32 @@ test("a suggested trip with nothing to personalise is its template, slot for slo
 });
 
 test("easy drops only a non-featured walk, never a day's only walk, only past three stops", () => {
-  for (const { answers, options } of sweep) if (answers.pace === "easy" && answers.food) for (const o of options) for (const d of o.days) {
+  for (const { answers, options } of sweep) if (answers.pace === "easy" && answers.food) for (const o of options) {
+    const before = new Set();
+    for (const d of o.days) {
     if (d.free) continue;
     const items = blockById[d.block].items;
-    const gone = items.filter((x) => !d.items.some((it) => it.siteId === x.siteId));
+    // in a built trip a non-Food place an earlier day had is dropped too; that isn't Easy's doing
+    const gone = items.filter((x) => !d.items.some((it) => it.siteId === x.siteId) &&
+      !(o.kind === "built" && !foodOnly(data.places[x.siteId]) && before.has(x.siteId)));
+    d.items.forEach((it) => before.add(it.siteId));
     assert.ok(gone.length <= 1, `${name(answers)} ${o.key} ${d.block}`);
     if (!gone.length) continue;
     const p = data.places[gone[0].siteId];
     assert.ok(items.length > 3 && !p.featured && p.category.includes("Walks"), `${name(answers)} ${p.id}`);
     assert.ok(items.filter((x) => data.places[x.siteId].category.includes("Walks")).length >= 2, `${name(answers)} only walk ${p.id}`);
+    }
+  }
+});
+
+test("built trips never repeat a place, except Food places", () => {
+  for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") {
+    const day = {};
+    o.days.forEach((d, i) => d.items.forEach((it) => {
+      if (foodOnly(data.places[it.siteId])) return;
+      assert.ok(day[it.siteId] === undefined, `${name(answers)} ${o.key} ${it.siteId} on days ${day[it.siteId] + 1} and ${i + 1}`);
+      day[it.siteId] = i;
+    }));
   }
 });
 

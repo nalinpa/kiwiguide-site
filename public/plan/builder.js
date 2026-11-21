@@ -175,6 +175,7 @@ function ranked(list, ans) {
 }
 
 // Turn a route into the trip: food off, pace, picked activities and interests, each day timed by packTrip.
+// A built route also drops a non-Food place an earlier day already has; a suggested trip keeps its own repeats.
 function personalise(data, pack, ans, route) {
   var places = data.places, look = function (id) { return places[id]; };
   var used = {}, prevLast = null, at = ans.start, planned = {};
@@ -189,7 +190,10 @@ function personalise(data, pack, ans, route) {
   var days = route.blocks.map(function (b) {
     if (!b) return { town: at, free: true, items: [] };
     at = b.endTown;
-    var items = b.items.filter(function (it) { return ans.food || !foodOnly(places[it.siteId]); }).map(function (it) {
+    var items = b.items.filter(function (it) {
+      var p = places[it.siteId];
+      return foodOnly(p) ? ans.food : !(route.kind === "built" && used[p.id]);
+    }).map(function (it) {
       return { siteId: it.siteId, siteName: it.siteName, slotIndex: it.slotIndex, durationSlots: it.durationSlots };
     });
     var walks = items.filter(function (it) { return places[it.siteId].category.indexOf("Walks") >= 0; });

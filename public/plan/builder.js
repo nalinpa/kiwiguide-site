@@ -49,41 +49,46 @@ function prepare(data) {
   return ctx;
 }
 
-// Towns that can still reach a target town in exactly r more days: reach[r][town].
-function reachable(ctx, towns, targets, days, allowed, freeOk) {
-  var reach = [{}];
-  targets.forEach(function (t) { reach[0][t] = true; });
+// The fewest free days needed to reach a target town in exactly r more days: need[r][town] (missing = can't).
+function freeNeeded(ctx, towns, targets, days, allowed, freeOk) {
+  var need = [{}];
+  targets.forEach(function (t) { need[0][t] = 0; });
   for (var r = 1; r <= days; r++) {
-    reach[r] = {};
+    need[r] = {};
     for (var i = 0; i < towns.length; i++) {
-      var t = towns[i], ok = freeOk(t) && reach[r - 1][t];
-      (ctx.out[t] || []).forEach(function (b) { if (allowed(b) && reach[r - 1][b.endTown]) ok = true; });
-      if (ok) reach[r][t] = true;
+      var t = towns[i], best = freeOk(t) && need[r - 1][t] !== undefined ? need[r - 1][t] + 1 : Infinity;
+      (ctx.out[t] || []).forEach(function (b) {
+        if (allowed(b) && need[r - 1][b.endTown] !== undefined) best = Math.min(best, need[r - 1][b.endTown]);
+      });
+      if (best < Infinity) need[r][t] = best;
     }
   }
-  return reach;
+  return need;
 }
+function freeCap(days) { return Math.floor(days / 4); }
 
 // The best route of exactly ans.days days from ans.start to one of `targets`, as a beam search over the blocks.
-// mode 0: within the drive limit, free days in towns that have a town day; 1: any drive; 2: free days anywhere.
+// mode 0: within the drive limit, at most a quarter of the days free, in towns that have a town day;
+// 1: any drive; 2 (last resort): free days anywhere, no cap.
 function search(ctx, ans, targets, mode, pts) {
-  var limit = ans.drive, n = ans.days, start = ans.start;
+  var limit = ans.drive, n = ans.days, start = ans.start, cap = mode === 2 ? n : freeCap(n);
   var allowed = function (b) { return mode > 0 || b.driveMinutes <= limit; };
   var freeOk = function (t) { return mode === 2 || !!ctx.stays[t]; };
   var towns = Object.keys(ctx.out).concat(targets, [start]);
-  var reach = reachable(ctx, towns, targets, n, allowed, freeOk);
-  if (!reach[n][start]) return null;
-  var states = [{ town: start, cost: 0, key: "", seq: [], uses: new Uint8Array(ctx.blocks.length), mask: new Uint32Array(ctx.words), seen: "|" + start + "|", last: null, prevBlock: null, home: 0 }];
+  var need = freeNeeded(ctx, towns, targets, n, allowed, freeOk);
+  var can = function (r, town, free) { return need[r][town] !== undefined && free + need[r][town] <= cap; };
+  if (!can(n, start, 0)) return null;
+  var states = [{ town: start, cost: 0, key: "", seq: [], uses: new Uint8Array(ctx.blocks.length), mask: new Uint32Array(ctx.words), seen: "|" + start + "|", last: null, prevBlock: null, home: 0, free: 0 }];
   for (var day = 0; day < n; day++) {
     var rem = n - day - 1, next = [];
     states.forEach(function (s) {
       var moves = [], fresh = false;
       (ctx.out[s.town] || []).forEach(function (b) {
-        if (!allowed(b) || s.uses[b.ix] >= 2 || b === s.last || !reach[rem][b.endTown]) return;
+        if (!allowed(b) || s.uses[b.ix] >= 2 || b === s.last || !can(rem, b.endTown, s.free)) return;
         moves.push(b);
         if (!s.uses[b.ix]) fresh = true;
       });
-      if (freeOk(s.town) && reach[rem][s.town]) { moves.push(null); fresh = true; }
+      if (freeOk(s.town) && can(rem, s.town, s.free + 1)) { moves.push(null); fresh = true; }
       moves.forEach(function (b) {
         if (b && fresh && s.uses[b.ix]) return; // a block again only when nothing else is left
         next.push(step(ctx, ans, s, b, pts));
@@ -104,8 +109,8 @@ function search(ctx, ans, targets, mode, pts) {
 function cheaper(a, b) { return a.cost - b.cost || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); }
 
 function step(ctx, ans, s, b, pts) {
-  var t = { town: s.town, cost: s.cost, key: s.key + "|" + (b ? b.id : "~"), seq: s.seq.concat([b]), uses: s.uses, mask: s.mask, seen: s.seen, last: b, prevBlock: s.prevBlock, home: s.home };
-  if (!b) { t.cost += COST.free; return t; }
+  var t = { town: s.town, cost: s.cost, key: s.key + "|" + (b ? b.id : "~"), seq: s.seq.concat([b]), uses: s.uses, mask: s.mask, seen: s.seen, last: b, prevBlock: s.prevBlock, home: s.home, free: s.free };
+  if (!b) { t.cost += COST.free; t.free++; return t; }
   t.town = b.endTown;
   t.uses = s.uses.slice(); t.uses[b.ix]++;
   if (s.uses[b.ix]) t.cost += COST.reuse;
@@ -175,7 +180,7 @@ function personalise(data, pack, ans, route) {
   var used = {}, prevLast = null, at = ans.start, planned = {};
   route.blocks.forEach(function (b) { if (b) b.items.forEach(function (it) { planned[it.siteId] = true; }); });
   var ok = function (p) { return !used[p.id] && (ans.food || !foodOnly(p)); };
-  var spare = function (p) { return ok(p) && !planned[p.id]; }; // never add a stop another day already has
+  var spare = function (p) { return ok(p) && !planned[p.id]; }; // never add a place the trip already has
   var inRoute = {};
   route.blocks.forEach(function (b) {
     if (b) b.items.forEach(function (it) { if (ok(places[it.siteId])) places[it.siteId].activities.forEach(function (a) { inRoute[a] = true; }); });
@@ -184,13 +189,14 @@ function personalise(data, pack, ans, route) {
   var days = route.blocks.map(function (b) {
     if (!b) return { town: at, free: true, items: [] };
     at = b.endTown;
-    var items = b.items.filter(function (it) { return ok(places[it.siteId]); }).map(function (it) {
+    var items = b.items.filter(function (it) { return ans.food || !foodOnly(places[it.siteId]); }).map(function (it) {
       return { siteId: it.siteId, siteName: it.siteName, slotIndex: it.slotIndex, durationSlots: it.durationSlots };
     });
-    if (ans.pace === "easy" && items.length > 3) {
-      // Easy: drop the day's longest walk, a walk that matches nothing first.
-      var walks = items.filter(function (it) { return places[it.siteId].category.indexOf("Walks") >= 0; }).sort(function (x, y) {
-        return fitScore(places[x.siteId], ans) - fitScore(places[y.siteId], ans) || y.durationSlots - x.durationSlots || (x.siteId < y.siteId ? -1 : 1);
+    var walks = items.filter(function (it) { return places[it.siteId].category.indexOf("Walks") >= 0; });
+    if (ans.pace === "easy" && items.length > 3 && walks.length > 1) {
+      // Easy: drop the day's longest walk that isn't featured (never its only walk), a walk that matches nothing first.
+      walks = walks.filter(function (it) { return !places[it.siteId].featured; }).sort(function (x, y) {
+        return y.durationSlots - x.durationSlots || fitScore(places[x.siteId], ans) - fitScore(places[y.siteId], ans) || (x.siteId < y.siteId ? -1 : 1);
       });
       if (walks.length) items.splice(items.indexOf(walks[0]), 1);
     }
@@ -232,9 +238,8 @@ function personalise(data, pack, ans, route) {
 }
 
 // buildTrips(data, pack, answers) -> up to three trip options, best first.
-// Suggested trips with the same start and length (and no more over-limit days than the best built route) come
-// first; then the best loop and the best one-way built from the blocks, the one-way only when it scores at least
-// as well as the loop.
+// Suggested trips with the same start and length always come first (over-limit days marked); then the best loop
+// and the best one-way built from the blocks, the one-way only when it scores at least as well as the loop.
 function buildTrips(data, pack, ans) {
   var ctx = prepare(data), pts = new Array(ctx.words * 32);
   Object.keys(ctx.stopIx).forEach(function (id) { pts[ctx.stopIx[id]] = fitScore(data.places[id], ans); });
@@ -245,7 +250,6 @@ function buildTrips(data, pack, ans) {
   if (oneWay && (!loop || oneWay.cost <= loop.cost)) built.push(oneWay);
   built.sort(function (a, b) { return a.cost - b.cost; });
   built = built.filter(function (r, i) { return !i || r.cost < 1e9; }); // free days anywhere only when nothing else goes
-  var minOver = Math.min.apply(null, built.map(function (r) { return r.over; }));
   built.forEach(function (r) {
     r.kind = "built";
     r.key = "built-" + ans.start + "-" + ans.days + "-" + (r.end === ans.start ? "loop" : "oneway");
@@ -253,12 +257,9 @@ function buildTrips(data, pack, ans) {
   });
   var suggested = data.templates.filter(function (t) { return t.start === ans.start && t.blockIds.length === ans.days; }).map(function (t) {
     var blocks = t.blockIds.map(function (id) { return ctx.byId[id]; });
-    return { kind: "suggested", key: t.key, label: t.label, blocks: blocks, end: blocks[blocks.length - 1].endTown,
-      over: blocks.filter(function (b) { return b.driveMinutes > ans.drive; }).length };
-  }).filter(function (r) { return r.over <= minOver; });
-  var isLoop = function (r) { return r.end === ans.start; };
-  var routes = suggested.concat(built.filter(function (r) { return !suggested.some(function (s) { return isLoop(s) === isLoop(r); }); }));
-  return routes.slice(0, 3).map(function (r) {
+    return { kind: "suggested", key: t.key, label: t.label, blocks: blocks, end: blocks[blocks.length - 1].endTown };
+  });
+  return suggested.concat(built).slice(0, 3).map(function (r) {
     var p = personalise(data, pack, ans, r);
     return { kind: r.kind, key: r.key, label: r.label, start: ans.start, end: r.end, days: p.days, missing: p.missing };
   });

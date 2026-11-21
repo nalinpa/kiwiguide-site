@@ -296,6 +296,18 @@ test("pace: easy trims, big hikes adds long walks", () => {
   assert.ok(longWalks(ask({ ...a, pace: "hikes" })) > longWalks(ask(a)));
 });
 
+test("every returned day passes the final check, whatever removed or added its stops", () => {
+  // A packTrip that pushes the last stop past 10 PM on any day with more than 3 stops: such a day can never fit,
+  // so the builder must cut it, on every path (food off, Easy, repeats dropped, adds, suggested days).
+  const strict = { ...pack, packTrip: (days, look) => pack.packTrip(days, look).map((d) =>
+    d.items.length > 3 ? { ...d, items: d.items.map((it, k) => (k === d.items.length - 1 ? { ...it, slotIndex: 28 } : it)) } : d) };
+  for (const a of [{ start: "queenstown", days: 10, food: false }, { start: "dunedin", days: 12, pace: "easy", food: false }, { start: "invercargill", days: 21, drive: 120, pace: "hikes" }]) {
+    const options = buildTrips(data, strict, { ...base, ...a });
+    assert.ok(options.length >= 1);
+    for (const o of options) for (const d of o.days) assert.ok(d.items.length <= 3, `${o.key} ${d.block} has ${d.items.length}`);
+  }
+});
+
 test("same answers, same trip", () => {
   const a = { start: "dunedin", days: 12, pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Nature"], food: true, activities: ["hot-pools"] };
   assert.deepEqual(buildTrips(data, pack, a), buildTrips(data, pack, a));

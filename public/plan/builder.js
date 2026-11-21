@@ -239,6 +239,9 @@ function personalise(data, pack, ans, route) {
         .filter(function (p) { return !foodOnly(p); });
       while (sights() < 3 && add(fill, fill.length)) {}
     }
+    // The one final check every returned day passes, whatever removed or added its stops: packTrip moves nothing
+    // and nothing ends after 10 PM; otherwise drop the last stop and time the day again.
+    while (items.length && !fits(pack, look, prevLast, items)) items = packDay(pack, look, prevLast, items.slice(0, -1));
     items.forEach(function (it) { used[it.siteId] = true; });
     if (items.length) prevLast = items[items.length - 1];
     var day = { town: b.endTown, block: b.id, items: items.map(function (it) {

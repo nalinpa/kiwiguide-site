@@ -8,7 +8,7 @@ var TOWNS = [
   { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", fact: "Its Botanic Gardens have grown beside the Avon River since 1863.", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
   { id: "picton", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", fact: "The Cook Strait ferries from Wellington dock right in town.", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
   // Larnach Castle, Moturoa / Rabbit Island, Stirling Point (Bluff): featured places in each town
-  { id: "dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", fact: "The world’s only mainland albatross colony is at Taiaroa Head, inside the city limits.", img: PHOTO + "93b9fe65-f916-449e-90f3-9574ff1aef75.webp" },
+  { id: "dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", fact: "The world’s only mainland royal albatross colony is at Taiaroa Head, inside the city limits.", img: PHOTO + "93b9fe65-f916-449e-90f3-9574ff1aef75.webp" },
   { id: "nelson", name: "Nelson", sub: "Golden beaches and Abel Tasman on the sunny top of the island.", fact: "It’s one of the sunniest towns in New Zealand.", img: PHOTO + "2afe072b-3dc4-478e-868d-9a76d3a17775.webp" },
   { id: "invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "New Zealand’s southernmost city, and Burt Munro’s home town.", img: PHOTO + "c370321b-5445-4bc3-b38f-33b1164c909f.webp" },
 ];
@@ -192,7 +192,7 @@ function breakLine(n, st) {
   }
   var vibes = st.vibes || [];
   var p = VIBE_PHOTOS.filter(function (x) { return vibes.indexOf(x.vibe) >= 0; })[0] || VIBE_PHOTOS[VIBE_PHOTOS.length - 1];
-  return { line: "Over 1,000 places on the island. Picking the ones that fit you.", img: p.img, credit: p.credit };
+  return { line: "Over 500 places on the island. Picking the ones that fit you.", img: p.img, credit: p.credit };
 }
 
 function labelOf(list, id) { return list.filter(function (x) { return x.id === id; })[0].label; }
@@ -289,8 +289,7 @@ if (typeof document !== "undefined") (function () {
     });
     var data = fetch("/plan/builder-data.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
     Promise.all([data, pack]).then(function (v) {
-      load = { status: "ready", data: v[0], pack: v[1], minutes: {} };
-      v[0].blocks.forEach(function (b) { load.minutes[b.id] = b.driveMinutes; });
+      load = { status: "ready", data: v[0], pack: v[1] };
       onLoaded();
     }, function () { load = { status: "error" }; onLoaded(); });
   }
@@ -437,7 +436,7 @@ if (typeof document !== "undefined") (function () {
           var title = d.free || from === d.town ? areaName(d.town) : areaName(from) + " → " + areaName(d.town);
           var h = '<section class="q-day"><h2>Day ' + (k + 1) + " <span>· " + esc(title) + "</span></h2>";
           if (d.free) return h + '<div class="q-free"><p>A free day in ' + esc(areaName(d.town)) + "</p><small>Nothing planned. Swim, sleep in, or pick something from Explore in the app.</small></div></section>";
-          if (d.overLimit) h += '<p class="q-warn"><b>Long drive.</b> ' + esc(driveLine(load.minutes[d.block], st.drive)) + "</p>";
+          if (d.overLimit) h += '<p class="q-warn"><b>Long drive.</b> ' + esc(driveLine(d.driveMinutes, st.drive)) + "</p>";
           var notes = "";
           h += "<ul>" + d.items.map(function (i) {
             acts.forEach(function (a) { if (i.activities.indexOf(a) >= 0) notes += '<p class="q-act">' + esc(labelOf(ACTIVITIES, a) + ": " + i.siteName + ", " + i.timeLabel) + "</p>"; });

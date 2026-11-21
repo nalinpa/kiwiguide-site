@@ -158,6 +158,14 @@ function fits(pack, look, prevLast, items) {
   return out.every(function (it, k) { return it.slotIndex === items[k].slotIndex && it.slotIndex + it.durationSlots <= MAX_SLOT; });
 }
 
+// A day's driving as the app shows it: the legs from `from` through the stops that cross from one area to another.
+// (A block's driveMinutes is only the search's estimate: it counts from the start town's hub, before stops change.)
+function driveOf(pack, look, from, items) {
+  var slots = 0;
+  items.forEach(function (it) { var leg = pack.getLeg(from, it.siteId, look); if (leg.drive) slots += leg.slots; from = it.siteId; });
+  return slots * 30;
+}
+
 // Add the first candidate that goes in after a stop in its own area (or first thing, in the town the day starts in)
 // without moving any other stop.
 function tryAdd(pack, look, prevLast, items, cands, from, tries) {
@@ -248,12 +256,14 @@ function personalise(data, pack, ans, route) {
     // The one final check every returned day passes, whatever removed or added its stops: packTrip moves nothing
     // and nothing ends after 10 PM; otherwise drop the last stop and time the day again.
     while (items.length && !fits(pack, look, prevLast, items)) items = packDay(pack, look, prevLast, items.slice(0, -1));
-    items.forEach(function (it) { used[it.siteId] = true; });
-    if (items.length) prevLast = items[items.length - 1];
-    var day = { town: b.endTown, block: b.id, items: items.map(function (it) {
+    // Nothing left: the traveller stays put, as the app takes an empty day.
+    if (!items.length) return { town: b.endTown, block: b.id, free: true, items: [] };
+    var day = { town: b.endTown, block: b.id, driveMinutes: driveOf(pack, look, prevLast ? prevLast.siteId : pack.hubs[b.startTown], items), items: items.map(function (it) {
       return { siteId: it.siteId, siteName: it.siteName, slotIndex: it.slotIndex, durationSlots: it.durationSlots, timeLabel: it.timeLabel, durationLabel: it.durationLabel };
     }) };
-    if (b.driveMinutes > ans.drive) day.overLimit = true;
+    if (day.driveMinutes > ans.drive) day.overLimit = true;
+    items.forEach(function (it) { used[it.siteId] = true; });
+    prevLast = items[items.length - 1];
     return day;
   });
   var has = {};

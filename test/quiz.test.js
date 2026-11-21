@@ -83,7 +83,7 @@ test("revealState: loading, error, then the builder's options", () => {
 
 test("breakLine: the start town and days, then the vibe's photo", () => {
   const b1 = Q.breakLine(1, { start: "dunedin", days: 12 });
-  assert.equal(b1.line, "Dunedin, 12 days. Good pick. The world’s only mainland albatross colony is at Taiaroa Head, inside the city limits.");
+  assert.equal(b1.line, "Dunedin, 12 days. Good pick. The world’s only mainland royal albatross colony is at Taiaroa Head, inside the city limits.");
   assert.match(b1.img, /^https:\/\/api\.blacksands\.app\/images\/southislandguide\//);
   assert.equal(b1.credit, "");
   // one fact about the town itself: no promise of places the route may not visit
@@ -101,7 +101,7 @@ test("breakLine: the start town and days, then the vibe's photo", () => {
   assert.match(photo(["sightseeing"]), /photo-pukaki-/);
   assert.match(photo(["relax", "nature"]), /photo-diamond-lake-/);
   const b2 = Q.breakLine(2, { vibes: ["relax"] });
-  assert.equal(b2.line, "Over 1,000 places on the island. Picking the ones that fit you.");
+  assert.equal(b2.line, "Over 500 places on the island. Picking the ones that fit you.");
   assert.match(b2.credit, /^Photo: .*Michal Klajban, CC BY-SA 4\.0/);
   assert.ok(Q.breakLine(2, { vibes: [] }).credit);
 });

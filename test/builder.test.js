@@ -127,16 +127,41 @@ test("food off", () => {
     }
 });
 
-test("drive limit", () => {
+// The day's driving the app's way: each leg that crosses from one area to another (getLeg's drive), from the
+// last stop of the nearest earlier day with stops (else the block's start town hub) through the day's stops.
+function appDrive(o, i) {
+  const d = o.days[i];
+  if (!d.items.length) return 0;
+  const prev = o.days.slice(0, i).reverse().find((x) => x.items.length);
+  let from = prev ? prev.items[prev.items.length - 1].siteId : pack.hubs[blockById[d.block].startTown], slots = 0;
+  for (const it of d.items) {
+    const leg = pack.getLeg(from, it.siteId, lookup);
+    if (leg.drive) slots += leg.slots;
+    from = it.siteId;
+  }
+  return slots * 30;
+}
+
+test("drive limit: marked from the driving the app shows for the day", () => {
   for (const { answers, options } of sweep) {
-    for (const o of options) for (const d of o.days) {
-      const over = !d.free && blockById[d.block].driveMinutes > answers.drive;
-      assert.equal(!!d.overLimit, over, `${name(answers)} ${o.key}`);
-    }
+    for (const o of options) o.days.forEach((d, i) => {
+      const mins = appDrive(o, i);
+      assert.equal(!!d.overLimit, mins > answers.drive, `${name(answers)} ${o.key} day ${i + 1}: ${mins} min`);
+      if (!d.free) assert.equal(d.driveMinutes, mins, `${name(answers)} ${o.key} day ${i + 1}`);
+    });
+    // the search keeps to the limit by the blocks' estimate when a route within it exists
     const built = options.find((o) => o.kind === "built");
     if (built && withinLimitRouteExists(answers.start, answers.days, answers.drive))
-      assert.ok(!built.days.some((d) => d.overLimit), name(answers) + " has a route within the limit");
+      assert.ok(!built.days.some((d) => d.block && blockById[d.block].driveMinutes > answers.drive), name(answers) + " has a route within the limit");
   }
+});
+
+test("a day with no stops is a free day", () => {
+  // Picton 17d/2h food off: a block's second use loses every stop to the repeats dropped (day 15)
+  const picton = { answers: { ...base, start: "picton", days: 17, drive: 120, food: false } };
+  picton.options = buildTrips(data, pack, picton.answers);
+  for (const { answers, options } of sweep.concat([picton])) for (const o of options)
+    o.days.forEach((d, i) => assert.equal(!d.items.length, !!d.free, `${name(answers)} ${o.key} day ${i + 1}`));
 });
 
 test("suggested first", () => {

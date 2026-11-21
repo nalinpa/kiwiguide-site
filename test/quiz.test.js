@@ -2,35 +2,111 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-const Q = createRequire(import.meta.url)("../public/plan/quiz.js");
-const { bandsFor, tripsFor, interestsFrom, CARDS, monthsOf, startDateFor, matchCounts, stepFromHash, seasonOf, seasonLine, BANDS } = Q;
-const { trips } = JSON.parse(readFileSync(new URL("../public/plan/trips.json", import.meta.url), "utf8"));
+const req = createRequire(import.meta.url);
+const Q = req("../public/plan/quiz.js");
+const { monthsOf, startDateFor, stepFromHash, seasonOf, seasonLine, STEPS } = Q;
+const data = JSON.parse(readFileSync(new URL("../public/plan/builder-data.json", import.meta.url), "utf8"));
 const NOV20 = new Date(2026, 10, 20);
+const at = (name) => STEPS.indexOf(name);
+const full = { start: "dunedin", days: 12, season: "summer", month: { month: 0, year: 2027 }, pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"], pick: "built-dunedin-12-loop" };
 
-test("bandsFor: Picton has no short; Queenstown and Christchurch have all six", () => {
-  assert.equal(BANDS.length, 6);
-  const ids = (s) => bandsFor(trips, s).map((b) => b.id);
-  assert.deepEqual(ids("queenstown"), ["short", "weekend", "week", "ten", "fortnight", "long"]);
-  assert.deepEqual(ids("christchurch"), ["short", "weekend", "week", "ten", "fortnight", "long"]);
-  assert.ok(!ids("picton").includes("short"));
+test("steps in order: the owner's order, a break after days and after the vibe", () => {
+  assert.deepEqual(STEPS, ["start", "days", "break1", "season", "month", "pace", "drive", "vibe", "break2", "into", "food", "activities", "choice", "reveal", "account", "done"]);
 });
 
-test("tripsFor: bands, shortest first", () => {
-  assert.equal(tripsFor(trips, "queenstown", "ten").length, 3);
-  const w = tripsFor(trips, "queenstown", "weekend");
-  assert.deepEqual(w.map((t) => t.days.length), [3, 3, 4, 4]);
-  assert.equal(tripsFor(trips, "picton", "ten").length, 1);
+test("cleanState old shape: today's saved quiz gives a clean state at the first unanswered step", () => {
+  const old = { start: "queenstown", band: "weekend", idx: 8, liked: ["shotover-jet"], season: "summer", month: { month: 0, year: 2027 }, pick: "queenstown-weekend" };
+  let c;
+  assert.doesNotThrow(() => { c = Q.cleanState(old, NOV20); });
+  assert.equal(c.start, "queenstown");
+  assert.equal(c.days, null);
+  assert.equal(c.season, null);
+  assert.equal(c.pick, null);
+  assert.equal(Q.firstOpenStep(c, at("reveal")), at("days"));
+  assert.equal(Q.cleanState("junk", NOV20).start, null);
+  assert.equal(Q.cleanState({ start: "constructor" }, NOV20).start, null);
 });
 
-test("interestsFrom: Wine Tours by Bike gives food and adventure, once each", () => {
-  assert.deepEqual(interestsFrom(["wine-tours-by-bike"]), ["food", "adventure"]);
-  assert.deepEqual(interestsFrom(["wine-tours-by-bike", "nevis-bungy"]), ["food", "adventure"]);
-  assert.deepEqual(interestsFrom([]), []);
+test("cleanState: a full state passes; a bad answer drops it and everything after", () => {
+  assert.deepEqual(Q.cleanState(full, NOV20), full);
+  const a = Q.cleanState({ ...full, days: 2 }, NOV20);
+  assert.equal(a.days, null); assert.equal(a.pace, null); assert.equal(a.start, "dunedin");
+  const b = Q.cleanState({ ...full, drive: 999 }, NOV20);
+  assert.equal(b.drive, null); assert.equal(b.pace, "some"); assert.equal(b.vibes, null);
+  const c = Q.cleanState({ ...full, vibes: ["party"] }, NOV20);
+  assert.equal(c.vibes, null); assert.equal(c.drive, 240);
+  assert.equal(Q.cleanState({ ...full, into: ["Food"] }, NOV20).into, null);
+  assert.equal(Q.cleanState({ ...full, food: "yes" }, NOV20).food, null);
+  assert.equal(Q.cleanState({ ...full, activities: ["toString"] }, NOV20).activities, null);
+  assert.equal(Q.cleanState({ ...full, month: { month: 5, year: 2027 } }, NOV20).month, null);
+  const u = Q.cleanState({ ...full, season: "unsure", month: null }, NOV20);
+  assert.equal(u.season, "unsure"); assert.equal(u.pace, "some");
 });
 
-test("CARDS has eight, each with facts, what, yesIf and skipIf", () => {
-  assert.equal(CARDS.length, 8);
-  for (const c of CARDS) for (const k of ["siteId", "name", "town", "tag", "facts", "what", "yesIf", "skipIf", "img"]) assert.ok(c[k], c.siteId + " " + k);
+test("firstOpenStep: no landing past a missing answer; the month only for a season", () => {
+  const st = Q.cleanState(full, NOV20);
+  assert.equal(Q.firstOpenStep(st, at("account")), at("account"));
+  assert.equal(Q.firstOpenStep({ ...st, vibes: null }, at("into")), at("vibe"));
+  assert.equal(Q.firstOpenStep({ ...st, vibes: null }, at("break2")), at("vibe"));
+  assert.equal(Q.firstOpenStep({ ...st, food: null }, at("choice")), at("food"));
+  assert.equal(Q.firstOpenStep({ ...st, season: "unsure", month: null }, at("month")), at("season"));
+  assert.equal(Q.firstOpenStep({ ...st, season: "unsure", month: null }, at("pace")), at("pace"));
+  assert.equal(Q.firstOpenStep({ ...st, pick: null }, at("reveal")), at("choice"));
+  assert.equal(Q.firstOpenStep({ ...st, start: null }, at("days")), 0);
+  assert.equal(Q.firstOpenStep(st, at("break1")), at("break1"));
+});
+
+test("activitiesFor: skiing only for June to October starts; only what the data has", () => {
+  const ids = (d, m) => Q.activitiesFor(d, m).map((a) => a.id);
+  const fake = { places: { a: { activities: ["skiing"] }, b: { activities: ["surfing"] } } };
+  assert.deepEqual(ids(fake, 6), ["surfing", "skiing"]);
+  assert.deepEqual(ids(fake, 9), ["surfing", "skiing"]);
+  assert.deepEqual(ids(fake, 0), ["surfing"]);
+  assert.deepEqual(ids(fake, 4), ["surfing"]);
+  assert.deepEqual(ids(fake, 10), ["surfing"]);
+  const real = ids(data, 0);
+  assert.ok(real.includes("hot-pools") && !real.includes("skiing"));
+  for (const id of real) assert.ok(Object.values(data.places).some((p) => p.activities.includes(id)), id);
+  for (const a of Q.activitiesFor(data, 0)) assert.ok(a.label && a.hint, a.id);
+});
+
+test("revealState: loading, error, then the builder's options", () => {
+  const ans = Q.answersFor(full);
+  assert.equal(Q.revealState({ status: "loading" }, ans, () => assert.fail()), "loading");
+  assert.equal(Q.revealState({ status: "error" }, ans, () => assert.fail()), "error");
+  const seen = [];
+  const out = Q.revealState({ status: "ready", data: "D", pack: "P" }, ans, (d, p, a) => { seen.push([d, p, a]); return [{ key: "x" }]; });
+  assert.deepEqual(out, [{ key: "x" }]);
+  assert.deepEqual(seen, [["D", "P", ans]]);
+  assert.deepEqual(ans, { start: "dunedin", days: 12, pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"] });
+});
+
+test("breakLine: the start town and days, then the vibe's photo", () => {
+  const b1 = Q.breakLine(1, { start: "queenstown", days: 10 });
+  assert.equal(b1.line, "Queenstown, 10 days. Good pick: enough for the lakes and Fiordland.");
+  assert.match(b1.img, /^https:\/\/api\.blacksands\.app\/images\/southislandguide\//);
+  assert.equal(b1.credit, "");
+  assert.match(Q.breakLine(1, { start: "dunedin", days: 3 }).line, /^Dunedin, 3 days\. /);
+  for (const t of ["christchurch", "queenstown", "picton", "dunedin", "nelson", "invercargill"]) assert.ok(Q.breakLine(1, { start: t, days: 7 }).img, t);
+  const photo = (vibes) => Q.breakLine(2, { vibes }).img;
+  assert.match(photo(["adventure"]), /photo-shotover-jet-/);
+  assert.match(photo(["nature"]), /photo-diamond-lake-/);
+  assert.match(photo(["relax"]), /photo-gore-bay-/);
+  assert.match(photo(["sightseeing"]), /photo-pukaki-/);
+  assert.match(photo(["relax", "nature"]), /photo-diamond-lake-/);
+  const b2 = Q.breakLine(2, { vibes: ["relax"] });
+  assert.equal(b2.line, "Over 1,000 places on the island. Picking the ones that fit you.");
+  assert.match(b2.credit, /^Photo: .*Michal Klajban, CC BY-SA 4\.0/);
+  assert.ok(Q.breakLine(2, { vibes: [] }).credit);
+});
+
+test("measure params: kind, days, start, end, pace, drive, and nothing typed", () => {
+  const option = { kind: "built", key: "built-dunedin-12-oneway", label: "South Island in 12 Days", start: "dunedin", end: "christchurch", days: new Array(12).fill({ items: [] }), missing: [] };
+  const p = Q.measureParams(option, { ...full, email: "a@b.c" });
+  assert.deepEqual(p, { kind: "built", days: 12, start: "dunedin", end: "christchurch", pace: "some", drive: 240 });
+  const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
+  assert.match(src, /track\("quiz_reveal", Object\.assign\(\{ trip: [^)]*\}, measureParams\(/);
+  assert.equal((src.match(/track\("trip_saved", Object\.assign\(\{ trip: st\.pick, replaced: (true|false) \}, measureParams\(/g) || []).length, 2);
 });
 
 test("monthsOf: each month at its next occurrence, current month included", () => {
@@ -57,78 +133,12 @@ test("seasonOf and seasonLine", () => {
   assert.equal(seasonLine("unsure"), null);
 });
 
-test("matchCounts: each stop once per interest; none gives []", () => {
-  const trip = { days: [{ town: "x", items: [
-    { category: ["Walks", "Nature"] }, { category: ["Scenic", "Walks"] }, { category: ["Food"] }, { category: ["Attractions"] },
-  ] }] };
-  assert.deepEqual(matchCounts(trip, ["hikes", "scenic"]), [
-    { label: "hikes and nature stops", count: 2 }, { label: "scenic stop", count: 1 },
-  ]);
-  assert.deepEqual(matchCounts(trip, ["food"]), [{ label: "food stop", count: 1 }]);
-  assert.deepEqual(matchCounts(trip, ["adventure"]), []);
-  assert.deepEqual(matchCounts(trip, []), []);
-});
-
 test("stepFromHash", () => {
   assert.equal(stepFromHash("#3"), 3);
+  assert.equal(stepFromHash("#15"), 15);
   assert.equal(stepFromHash(""), 0);
   assert.equal(stepFromHash("#x"), 0);
   assert.equal(stepFromHash("#99"), 0);
-});
-
-test("reopenDeck: a finished deck shows the last card again, taking back its yes", () => {
-  const last = CARDS[7].siteId;
-  assert.deepEqual(Q.reopenDeck(8, ["hooker-valley-track", last]), { idx: 7, liked: ["hooker-valley-track"] });
-  assert.deepEqual(Q.reopenDeck(8, ["hooker-valley-track"]), { idx: 7, liked: ["hooker-valley-track"] });
-  assert.deepEqual(Q.reopenDeck(3, ["shotover-jet"]), { idx: 3, liked: ["shotover-jet"] });
-});
-
-test("cleanState: bad answers are dropped with everything after them; a good state passes", () => {
-  const key = tripsFor(trips, "queenstown", "weekend")[0].key;
-  const good = { start: "queenstown", band: "weekend", idx: 8, liked: ["shotover-jet"], season: "summer", month: { month: 0, year: 2027 }, pick: key };
-  assert.deepEqual(Q.cleanState(good, trips, NOV20), good);
-  assert.equal(Q.cleanState({ ...good, start: "mars" }, trips, NOV20).start, null);
-  const b = Q.cleanState({ ...good, pick: "nope" }, trips, NOV20);
-  assert.equal(b.pick, null); assert.equal(b.season, "summer");
-  const c = Q.cleanState({ ...good, band: "short" }, trips, NOV20); // Queenstown has a 2-day trip, so "short" is valid
-  assert.equal(c.band, "short"); assert.equal(c.pick, null);
-  const d = Q.cleanState({ ...good, season: "monsoon" }, trips, NOV20);
-  assert.equal(d.season, null); assert.equal(d.pick, null); assert.equal(d.band, "weekend");
-  assert.equal(Q.cleanState({ ...good, month: { month: 5, year: 2027 } }, trips, NOV20).month, null);
-  assert.equal(Q.cleanState("junk", trips, NOV20).start, null);
-  assert.equal(Q.cleanState({ ...good, liked: ["x"] }, trips, NOV20).band, "weekend");
-});
-
-test("cleanState: idx must be a number; names like constructor are not answers", () => {
-  const good = { start: "queenstown", band: "weekend", idx: 8, liked: [], season: "summer", month: null, pick: null };
-  const r = Q.cleanState({ ...good, idx: "3" }, trips, NOV20);
-  assert.equal(r.idx, 0); assert.equal(r.season, null); assert.equal(r.band, "weekend");
-  for (const bad of ["constructor", "__proto__", "toString"]) {
-    assert.equal(Q.cleanState({ ...good, start: bad }, trips, NOV20).start, null);
-    assert.equal(Q.cleanState({ ...good, band: bad }, trips, NOV20).band, null);
-    assert.equal(Q.cleanState({ ...good, season: bad }, trips, NOV20).season, null);
-    assert.equal(Q.cleanState({ ...good, pick: bad }, trips, NOV20).pick, null);
-  }
-});
-
-test("firstOpenStep: season and later need a finished deck", () => {
-  const st = { start: "queenstown", band: "weekend", idx: 3, liked: [], season: "summer", month: null, pick: null };
-  assert.equal(Q.firstOpenStep(st, 3), 2);
-  assert.equal(Q.firstOpenStep(st, 6), 2);
-  assert.equal(Q.firstOpenStep(st, 2), 2);
-  assert.equal(Q.firstOpenStep({ ...st, idx: 8 }, 3), 3);
-  assert.equal(Q.firstOpenStep({ ...st, start: null }, 3), 0);
-});
-
-test("strongInterests: the top interest and a runner-up within one; all yes highlights nothing", () => {
-  assert.deepEqual(Q.strongInterests([]), []);
-  // adventure x2 (shotover, nevis), hikes x1, scenic x1: top adventure, runner-up the first of the rest in order (hikes)
-  assert.deepEqual(Q.strongInterests(["shotover-jet", "nevis-bungy", "hooker-valley-track", "cruise-milford-small-boat-cruise"]), ["adventure", "hikes"]);
-  // hikes x3 vs food x1: food is two behind, so only hikes
-  assert.deepEqual(Q.strongInterests(["hooker-valley-track", "te-anau-glowworm-caves", "pancake-rocks-and-blowholes-walk", "redcliff-te-anau"]), ["hikes"]);
-  // a tie at the top keeps both and no runner-up
-  assert.deepEqual(Q.strongInterests(["hooker-valley-track", "redcliff-te-anau"]), ["hikes", "food"]);
-  assert.deepEqual(Q.strongInterests(CARDS.map((c) => c.siteId)), []);
 });
 
 test("tripPhotos: a different photo for each trip, never Food, from day 2 on", () => {
@@ -136,13 +146,11 @@ test("tripPhotos: a different photo for each trip, never Food, from day 2 on", (
   const a = { days: [{ items: [stop("g", "g.webp")] }, { items: [stop("r", "r.webp", ["Food"]), stop("x", "x.webp")] }] };
   const b = { days: [{ items: [stop("g", "g.webp")] }, { items: [stop("x", "x.webp"), stop("y", "y.webp")] }] };
   assert.deepEqual(Q.tripPhotos([a, b]), ["x.webp", "y.webp"]);
-  // the same first stop, the only photo: falls back rather than going blank
   const one = { days: [{ items: [stop("g", "g.webp")] }] };
   assert.deepEqual(Q.tripPhotos([one, one]), ["g.webp", "g.webp"]);
   assert.deepEqual(Q.tripPhotos([{ days: [{ items: [stop("n", null)] }] }]), [""]);
   assert.deepEqual(Q.tripPhotos([{ days: [{ items: [stop("f", "f.webp", ["Food"])] }] }]), ["f.webp"]);
-  const q = tripsFor(trips, "queenstown", "weekend"), p = Q.tripPhotos(q);
-  assert.equal(new Set(p).size, p.length);
+  assert.deepEqual(Q.tripPhotos([{ days: [{ free: true, items: [] }] }]), [""]);
 });
 
 test("dots: no middle dot survives into a rendered screen", () => {
@@ -150,12 +158,25 @@ test("dots: no middle dot survives into a rendered screen", () => {
   assert.ok(!out.includes("·"));
   assert.ok(out.includes("∙ Queenstown") && out.includes("3 days ∙ Back in"));
   const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
-  assert.ok(src.includes("root.innerHTML = dots(screens[step]())"), "render passes every screen through dots");
+  assert.ok(src.includes("root.innerHTML = dots(screens[STEPS[step]]())"), "render passes every screen through dots");
 });
 
 test("a stop with no photo gets its fallback URL; a real photo wins", () => {
   assert.equal(Q.stopPhoto({ thumb: null, fallback: "types/coffee" }), "/img/places/types/coffee.webp");
   assert.equal(Q.stopPhoto({ thumb: "a.webp", fallback: "types/coffee" }), "a.webp");
   assert.equal(Q.stopPhoto({ thumb: null }), "");
-  assert.deepEqual(Q.tripPhotos([{ days: [{ items: [{ thumb: null, fallback: "categories/Food", category: ["Food"] }] }] }]), ["/img/places/categories/Food.webp"]);
+});
+
+test("the start towns are the builder's six start cities, each with a photo from the image host and a line", () => {
+  assert.deepEqual(Q.TOWNS.map((t) => t.id).sort(), data.starts.slice().sort());
+  for (const t of Q.TOWNS) {
+    assert.match(t.img, /^https:\/\/api\.blacksands\.app\/images\/southislandguide\/[0-9a-f-]+\.webp$/, t.id);
+    assert.ok(t.sub && t.name === data.towns[t.id].name, t.id);
+  }
+});
+
+test("driveLine: the over-limit line", () => {
+  assert.equal(Q.driveLine(320, 240), "About 5 h 20 of driving. Over your 4 h limit.");
+  assert.equal(Q.driveLine(300, 120), "About 5 h of driving. Over your 2 h limit.");
+  assert.equal(Q.driveLine(185, 120), "About 3 h 05 of driving. Over your 2 h limit.");
 });

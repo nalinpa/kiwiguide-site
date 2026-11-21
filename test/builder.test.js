@@ -184,6 +184,41 @@ test("easy drops only a non-featured walk, never a day's only walk, only past th
   }
 });
 
+// Could some place in the day's end or start town, not in the trip or its blocks and not Food-only, still go in?
+// Same rules as the builder: after a stop in its own area (first: the day's first stop is in its area, or it's in
+// the start town), nothing else moves, it ends by 6 PM (8 PM if outdoors only), the day is a packTrip fixed point.
+const OUTDOORS = ["Walks", "Scenic", "Nature", "Water"];
+function someCandidateFits(o, i) {
+  const d = o.days[i], b = blockById[d.block];
+  const taken = new Set(o.days.flatMap((x) => x.items.map((it) => it.siteId).concat(x.block ? blockById[x.block].items.map((it) => it.siteId) : [])));
+  const prev = o.days.slice(0, i).reverse().find((x) => x.items.length);
+  const prevDay = { items: prev ? [prev.items[prev.items.length - 1]] : [] };
+  const items = d.items.map((it) => ({ ...it }));
+  const cands = [b.endTown, b.startTown].flatMap((t) => (data.towns[t] ? data.towns[t].placeIds : []))
+    .map((id) => data.places[id]).filter((p) => !taken.has(p.id) && !foodOnly(p));
+  for (const p of cands) for (let pos = 0; pos <= items.length; pos++) {
+    const after = pos ? items[pos - 1] : items[0];
+    if (after && data.places[after.siteId].area !== p.area && !(pos === 0 && p.area === b.startTown)) continue;
+    const trial = items.slice();
+    trial.splice(pos, 0, { siteId: p.id, siteName: p.name, slotIndex: pos ? after.slotIndex + after.durationSlots : 0, durationSlots: p.slots });
+    const out = pack.packTrip([prevDay, { items: trial }], lookup)[1].items;
+    if (!out.every((it, k) => k === pos || it.slotIndex === trial[k].slotIndex)) continue;
+    const end = p.category.every((c) => OUTDOORS.includes(c)) ? 24 : 20;
+    if (out[pos].slotIndex + p.slots > end) continue;
+    const again = pack.packTrip([prevDay, { items: out }], lookup)[1].items;
+    if (again.every((it, k) => it.slotIndex === out[k].slotIndex && it.slotIndex + it.durationSlots <= 28)) return p.id;
+  }
+  return null;
+}
+
+test("built days have at least 2 non-Food stops unless nothing more fits", () => {
+  for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") o.days.forEach((d, i) => {
+    if (d.free) return;
+    const sights = d.items.filter((it) => !foodOnly(data.places[it.siteId])).length;
+    if (sights < 2) assert.equal(someCandidateFits(o, i), null, `${name(answers)} ${o.key} day ${i + 1} has ${sights}`);
+  });
+});
+
 test("built trips never repeat a place, except Food places", () => {
   for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") {
     const day = {};

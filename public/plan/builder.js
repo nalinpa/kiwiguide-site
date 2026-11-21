@@ -7,7 +7,7 @@ var MAX_SLOT = 28; // 10 PM, the end of the app's day grid
 // (walks, scenic, nature, water only); add hours to the export if that's too blunt
 var ADD_END = 20, ADD_END_OUTDOORS = 24;
 var OUTDOORS = ["Walks", "Scenic", "Nature", "Water"];
-var COST = { over: 1e6, overMinute: 100, free: 60, reuse: 300, dupe: 25, emptyDay: 200, revisit: 40, match: 3, template: 8 };
+var COST = { over: 1e6, overMinute: 100, free: 60, reuse: 300, dupe: 25, dupeSight: 60, emptyDay: 200, revisit: 40, match: 3, template: 8 };
 var BEAM = 6; // routes kept per town per day
 var TRIES = 6; // candidate places tried per add
 
@@ -29,11 +29,11 @@ var prepared = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 function prepare(data) {
   var ctx = prepared && prepared.get(data);
   if (ctx) return ctx;
-  var blocks = data.blocks.slice().sort(byId), stopIx = {}, nStops = 0, out = {}, stays = {}, pairs = {};
+  var blocks = data.blocks.slice().sort(byId), food = [], stopIx = {}, nStops = 0, out = {}, stays = {}, pairs = {};
   blocks.forEach(function (b, i) {
     b = blocks[i] = { id: b.id, ix: i, startTown: b.startTown, endTown: b.endTown, driveMinutes: b.driveMinutes, items: b.items, stops: [] };
     b.items.forEach(function (it) {
-      if (!(it.siteId in stopIx)) stopIx[it.siteId] = nStops++;
+      if (!(it.siteId in stopIx)) { food[nStops] = foodOnly(data.places[it.siteId]); stopIx[it.siteId] = nStops++; }
       b.stops.push(stopIx[it.siteId]);
     });
     (out[b.startTown] = out[b.startTown] || []).push(b);
@@ -44,7 +44,7 @@ function prepare(data) {
   data.templates.forEach(function (t) {
     t.blockIds.forEach(function (id, i) { pairs[(i ? t.blockIds[i - 1] : "^" + t.start) + ">" + id] = true; });
   });
-  ctx = { blocks: blocks, byId: ixOf, out: out, stays: stays, pairs: pairs, stopIx: stopIx, words: Math.ceil(nStops / 32) };
+  ctx = { blocks: blocks, byId: ixOf, out: out, stays: stays, pairs: pairs, stopIx: stopIx, food: food, words: Math.ceil(nStops / 32) };
   if (prepared) prepared.set(data, ctx);
   return ctx;
 }
@@ -124,7 +124,7 @@ function step(ctx, ans, s, b, pts) {
   var fresh = 0;
   b.stops.forEach(function (i) {
     var w = i >> 5, bit = 1 << (i & 31);
-    if (t.mask[w] & bit) t.cost += COST.dupe;
+    if (t.mask[w] & bit) t.cost += ctx.food[i] ? COST.dupe : COST.dupeSight; // a repeated sight costs a free day
     else { fresh++; t.cost -= COST.match * pts[i]; t.mask[w] |= bit; }
   });
   if (!fresh) t.cost += COST.emptyDay; // every stop already done: a day of driving only
@@ -152,13 +152,14 @@ function fits(pack, look, prevLast, items) {
   return out.every(function (it, k) { return it.slotIndex === items[k].slotIndex && it.slotIndex + it.durationSlots <= MAX_SLOT; });
 }
 
-// Add the first candidate that goes in after a stop in its own area without moving any other stop.
-function tryAdd(pack, look, prevLast, items, cands) {
-  for (var c = 0; c < cands.length && c < TRIES; c++) {
+// Add the first candidate that goes in after a stop in its own area (or first thing, in the town the day starts in)
+// without moving any other stop.
+function tryAdd(pack, look, prevLast, items, cands, from, tries) {
+  for (var c = 0; c < cands.length && c < (tries || TRIES); c++) {
     var p = cands[c];
     for (var pos = 0; pos <= items.length; pos++) {
       var after = pos ? items[pos - 1] : items[0];
-      if (after && look(after.siteId).area !== p.area) continue;
+      if (after && look(after.siteId).area !== p.area && !(!pos && p.area === from)) continue;
       var trial = items.slice();
       trial.splice(pos, 0, { siteId: p.id, siteName: p.name, slotIndex: pos ? after.slotIndex + after.durationSlots : 0, durationSlots: p.slots });
       var out = packDay(pack, look, prevLast, trial);
@@ -169,15 +170,18 @@ function tryAdd(pack, look, prevLast, items, cands) {
   return null;
 }
 
+// Best fit first: answer matches, then featured, then id.
 function ranked(list, ans) {
   return list.map(function (p) { return { p: p, s: fitScore(p, ans) }; })
-    .sort(function (a, b) { return b.s - a.s || (b.p.featured ? 1 : 0) - (a.p.featured ? 1 : 0) || (a.p.id < b.p.id ? -1 : 1); });
+    .sort(function (a, b) { return b.s - a.s || (b.p.featured ? 1 : 0) - (a.p.featured ? 1 : 0) || (a.p.id < b.p.id ? -1 : 1); })
+    .map(function (x) { return x.p; });
 }
 
 // Turn a route into the trip: food off, pace, picked activities and interests, each day timed by packTrip.
 // A built route also drops a non-Food place an earlier day already has; a suggested trip keeps its own repeats.
 function personalise(data, pack, ans, route) {
   var places = data.places, look = function (id) { return places[id]; };
+  var townPlaces = function (t) { return data.towns[t] ? data.towns[t].placeIds.map(look) : []; };
   var used = {}, prevLast = null, at = ans.start, planned = {};
   route.blocks.forEach(function (b) { if (b) b.items.forEach(function (it) { planned[it.siteId] = true; }); });
   var ok = function (p) { return !used[p.id] && (ans.food || !foodOnly(p)); };
@@ -211,22 +215,29 @@ function personalise(data, pack, ans, route) {
     var near = [];
     Object.keys(areas).sort().forEach(function (a) { if (data.towns[a]) near = near.concat(data.towns[a].placeIds.map(look)); });
     near = near.filter(spare);
-    var add = function (cands) {
+    var add = function (cands, tries) {
       cands = cands.filter(function (p) { return !items.some(function (it) { return it.siteId === p.id; }); });
-      var out = tryAdd(pack, look, prevLast, items, ranked(cands, ans).map(function (x) { return x.p; }));
+      var out = tryAdd(pack, look, prevLast, items, cands, b.startTown, tries);
       if (out) items = out;
       return !!out;
     };
     pending = pending.filter(function (a) {
-      return !add(near.filter(function (p) { return p.activities.indexOf(a) >= 0; }));
+      return !add(ranked(near.filter(function (p) { return p.activities.indexOf(a) >= 0; }), ans));
     });
     if (ans.pace === "hikes" && !items.some(function (it) { return longWalk(places[it.siteId]); }))
-      add(near.filter(longWalk));
+      add(ranked(near.filter(longWalk), ans));
     // A town day with room, or a drive day left with no stops, gets a place in town that fits the answers.
     if ((b.startTown === b.endTown && (ans.pace !== "easy" || items.length <= 3)) || !items.length) {
-      add((data.towns[b.endTown] ? data.towns[b.endTown].placeIds.map(look) : []).filter(function (p) {
+      add(ranked(townPlaces(b.endTown).filter(function (p) {
         return spare(p) && !foodOnly(p) && fitScore(p, ans) > 0; // food tips come with the day blocks
-      }));
+      }), ans));
+    }
+    // A built day left with fewer than 3 sights is topped up from its end town, then its start town.
+    var sights = function () { return items.filter(function (it) { return !foodOnly(places[it.siteId]); }).length; };
+    if (route.kind === "built") {
+      var fill = ranked(townPlaces(b.endTown).filter(spare), ans).concat(b.startTown === b.endTown ? [] : ranked(townPlaces(b.startTown).filter(spare), ans))
+        .filter(function (p) { return !foodOnly(p); });
+      while (sights() < 3 && add(fill, fill.length)) {}
     }
     items.forEach(function (it) { used[it.siteId] = true; });
     if (items.length) prevLast = items[items.length - 1];

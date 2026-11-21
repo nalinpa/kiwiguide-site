@@ -510,3 +510,18 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
 .q-or::before, .q-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .q-status:empty { margin: -6px 0; min-height: 0; }
 .q-status { margin: 0; text-align: center; color: var(--muted); font-weight: 600; }
+/* Quiz on iPad: phones and Split View (under 768px) stay as above */
+@media (min-width: 768px) {
+  .quiz { max-width: 760px; }
+  .q-main { padding-inline: 24px; }
+  .q-main h1 { font-size: 2.5rem; }
+  .q-btn { font-size: 1.25rem; }
+  .q-main:has(> .q-btn), .q-main:has(> .q-town), .q-main:has(> .q-trip) { display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: 14px; }
+  .q-main:has(> .q-btn) > :not(.q-btn), .q-main:has(> .q-town) > :not(.q-town), .q-main:has(> .q-trip) > :not(.q-trip) { grid-column: 1 / -1; margin-bottom: 0; }
+  .q-town { min-height: 220px; }
+  .q-main:has(> .q-form) { width: 100%; max-width: 520px; margin-inline: auto; }
+}
+@media (min-width: 1024px) {
+  .q-days { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; align-items: start; }
+  .q-main:has(> .q-form) { width: 100%; max-width: 520px; margin-inline: auto; }
+}

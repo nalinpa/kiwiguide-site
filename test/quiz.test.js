@@ -82,12 +82,18 @@ test("revealState: loading, error, then the builder's options", () => {
 });
 
 test("breakLine: the start town and days, then the vibe's photo", () => {
-  const b1 = Q.breakLine(1, { start: "queenstown", days: 10 });
-  assert.equal(b1.line, "Queenstown, 10 days. Good pick: enough for the lakes and Fiordland.");
+  const b1 = Q.breakLine(1, { start: "dunedin", days: 12 });
+  assert.equal(b1.line, "Dunedin, 12 days. Good pick. The world’s only mainland albatross colony is at Taiaroa Head, inside the city limits.");
   assert.match(b1.img, /^https:\/\/api\.blacksands\.app\/images\/southislandguide\//);
   assert.equal(b1.credit, "");
-  assert.match(Q.breakLine(1, { start: "dunedin", days: 3 }).line, /^Dunedin, 3 days\. /);
-  for (const t of ["christchurch", "queenstown", "picton", "dunedin", "nelson", "invercargill"]) assert.ok(Q.breakLine(1, { start: t, days: 7 }).img, t);
+  // one fact about the town itself: no promise of places the route may not visit
+  const routeWords = /enough for|time for|the Catlins|Fiordland|Abel Tasman|Mount Cook|Tekapo|Kaikōura|Central Otago/;
+  for (const t of ["christchurch", "queenstown", "picton", "dunedin", "nelson", "invercargill"]) {
+    const b = Q.breakLine(1, { start: t, days: 7 });
+    assert.ok(b.img, t);
+    assert.match(b.line, new RegExp("^" + Q.TOWNS.find((x) => x.id === t).name + ", 7 days\\. Good pick\\. \\S.*\\.$"), t);
+    assert.doesNotMatch(b.line, routeWords, t);
+  }
   const photo = (vibes) => Q.breakLine(2, { vibes }).img;
   assert.match(photo(["adventure"]), /photo-shotover-jet-/);
   assert.match(photo(["nature"]), /photo-diamond-lake-/);
@@ -107,6 +113,29 @@ test("measure params: kind, days, start, end, pace, drive, and nothing typed", (
   const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
   assert.match(src, /track\("quiz_reveal", Object\.assign\(\{ trip: [^)]*\}, measureParams\(/);
   assert.equal((src.match(/track\("trip_saved", Object\.assign\(\{ trip: st\.pick, replaced: (true|false) \}, measureParams\(/g) || []).length, 2);
+});
+
+test("summaryLine: the visitor's own answers, and no 'liked' count", () => {
+  const built = { kind: "built" }, sugg = { kind: "suggested" };
+  const st = { ...full, vibes: ["relax", "nature"] };
+  assert.equal(Q.summaryLine(built, st), "Built for you: Some walking · up to 4 h driving · Relax and Nature · food tips on · hot pools.");
+  assert.equal(Q.summaryLine(sugg, { ...st, vibes: [], food: false, activities: [], drive: 120, pace: "easy" }), "Hand-checked trip: Easy · up to 2 h driving · no food tips.");
+  const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
+  assert.ok(!/You liked|you’ll like|q-liked/.test(src), "no 'liked' marks left on the reveal");
+});
+
+test("load retry: an error goes back to idle so the load runs again; the error screen offers it", () => {
+  assert.deepEqual(Q.retryLoad({ status: "error" }), { status: "idle" });
+  const loading = { status: "loading" }, ready = { status: "ready", data: {} };
+  assert.equal(Q.retryLoad(loading), loading);
+  assert.equal(Q.retryLoad(ready), ready);
+  assert.match(Q.waitScreen("error"), /<button type="button"[^>]*data-act="reload"[^>]*>Try again<\/button>/);
+  assert.match(Q.waitScreen("error"), /href="\/#trips"/);
+  assert.doesNotMatch(Q.waitScreen("loading"), /data-act="reload"/);
+});
+
+test("activity hints are true to the data: no fiords for kayaking", () => {
+  assert.equal(Q.ACTIVITIES.find((a) => a.id === "kayaking").hint, "Lakes and bays");
 });
 
 test("monthsOf: each month at its next occurrence, current month included", () => {

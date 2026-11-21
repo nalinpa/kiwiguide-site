@@ -2,15 +2,15 @@
 // The pure functions at the top are tested (test/quiz.test.js); the page code at the bottom only runs in a browser.
 
 var PHOTO = "https://api.blacksands.app/images/southislandguide/";
-// near: what the first photo break says the trip has time for
+// fact: the first photo break's line, true of the town itself (never a place the route may skip)
 var TOWNS = [
-  { id: "queenstown", name: "Queenstown", sub: "Fly in to the lakes and mountains, with Wānaka and Milford Sound close by.", near: "the lakes and Fiordland", img: PHOTO + "a6904a0d-2c8e-4f25-b533-e51241d6665e.webp" },
-  { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", near: "Tekapo, Mount Cook or Kaikōura", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
-  { id: "picton", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", near: "the Marlborough Sounds and Abel Tasman", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
+  { id: "queenstown", name: "Queenstown", sub: "Fly in to the lakes and mountains, with Wānaka and Milford Sound close by.", fact: "The world’s first commercial bungy jump opened here, off the Kawarau Bridge, in 1988.", img: PHOTO + "a6904a0d-2c8e-4f25-b533-e51241d6665e.webp" },
+  { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", fact: "Its Botanic Gardens have grown beside the Avon River since 1863.", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
+  { id: "picton", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", fact: "The Cook Strait ferries from Wellington dock right in town.", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
   // Larnach Castle, Moturoa / Rabbit Island, Stirling Point (Bluff): featured places in each town
-  { id: "dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", near: "the wildlife, the Catlins and Central Otago", img: PHOTO + "93b9fe65-f916-449e-90f3-9574ff1aef75.webp" },
-  { id: "nelson", name: "Nelson", sub: "Golden beaches and Abel Tasman on the sunny top of the island.", near: "the beaches and Abel Tasman", img: PHOTO + "2afe072b-3dc4-478e-868d-9a76d3a17775.webp" },
-  { id: "invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", near: "Bluff, the Catlins and Fiordland", img: PHOTO + "c370321b-5445-4bc3-b38f-33b1164c909f.webp" },
+  { id: "dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", fact: "The world’s only mainland albatross colony is at Taiaroa Head, inside the city limits.", img: PHOTO + "93b9fe65-f916-449e-90f3-9574ff1aef75.webp" },
+  { id: "nelson", name: "Nelson", sub: "Golden beaches and Abel Tasman on the sunny top of the island.", fact: "It’s one of the sunniest towns in New Zealand.", img: PHOTO + "2afe072b-3dc4-478e-868d-9a76d3a17775.webp" },
+  { id: "invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "New Zealand’s southernmost city, and Burt Munro’s home town.", img: PHOTO + "c370321b-5445-4bc3-b38f-33b1164c909f.webp" },
 ];
 
 var STEPS = ["start", "days", "break1", "season", "month", "pace", "drive", "vibe", "break2", "into", "food", "activities", "choice", "reveal", "account", "done"];
@@ -46,7 +46,7 @@ var ACTIVITIES = [
   { id: "skiing", label: "Skiing", hint: "Only offered June to October" },
   { id: "hot-pools", label: "Hot pools", hint: "Tekapo Springs and more" },
   { id: "mountain-biking", label: "Mountain biking", hint: "Trails and bike parks" },
-  { id: "kayaking", label: "Kayaking", hint: "Lakes, fiords and bays" },
+  { id: "kayaking", label: "Kayaking", hint: "Lakes and bays" },
   { id: "wildlife", label: "Wildlife", hint: "Penguins, seals, albatross and kiwi" },
   { id: "stargazing", label: "Stargazing", hint: "Dark-sky towns" },
   { id: "wine", label: "Wine", hint: "Cellar doors and tastings" },
@@ -187,11 +187,32 @@ function revealState(load, ans, build) {
 function breakLine(n, st) {
   if (n === 1) {
     var t = TOWNS.filter(function (x) { return x.id === st.start; })[0];
-    return { line: t.name + ", " + st.days + " days. Good pick: " + (st.days <= 4 ? "time for a taste of " : "enough for ") + t.near + ".", img: t.img, credit: "" };
+    // the photo is a thumbnail, so it shows as a card at its own size, not full screen
+    return { line: t.name + ", " + st.days + " days. Good pick. " + t.fact, img: t.img, credit: "", card: true };
   }
   var vibes = st.vibes || [];
   var p = VIBE_PHOTOS.filter(function (x) { return vibes.indexOf(x.vibe) >= 0; })[0] || VIBE_PHOTOS[VIBE_PHOTOS.length - 1];
   return { line: "Over 1,000 places on the island. Picking the ones that fit you.", img: p.img, credit: p.credit };
+}
+
+function labelOf(list, id) { return list.filter(function (x) { return x.id === id; })[0].label; }
+function and(list, word) { return list.length < 2 ? list.join("") : list.slice(0, -1).join(", ") + " " + (word || "and") + " " + list[list.length - 1]; }
+
+// The reveal's summary: the visitor's own answers, nothing more.
+function summaryLine(option, st) {
+  var parts = [labelOf(PACES, st.pace), "up to " + st.drive / 60 + " h driving"];
+  if (st.vibes.length) parts.push(and(st.vibes.map(function (v) { return labelOf(VIBES, v); })));
+  parts.push(st.food ? "food tips on" : "no food tips");
+  st.activities.forEach(function (a) { parts.push(labelOf(ACTIVITIES, a).toLowerCase()); });
+  return (option.kind === "built" ? "Built for you: " : "Hand-checked trip: ") + parts.join(" · ") + ".";
+}
+
+// "Try again" after a failed load: back to idle, so the next render loads again. Anything else stays as it is.
+function retryLoad(load) { return load.status === "error" ? { status: "idle" } : load; }
+// What the trip screens show while the builder's data loads, or when it failed.
+function waitScreen(state) {
+  return state === "error" ? '<h1 tabindex="-1">Something went wrong</h1><p>The trips would not load. <button type="button" class="q-link" data-act="reload">Try again</button>, or <a href="/#trips">see the suggested trips</a>.</p>'
+    : '<p class="q-kicker">One moment</p><h1 tabindex="-1">Picking the places that fit you…</h1>';
 }
 
 // The extra Google Analytics params on quiz_reveal and trip_saved: fixed ids and numbers only, nothing typed.
@@ -211,7 +232,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { STEPS: STEPS, TOWNS: TOWNS, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine };
+  module.exports = { STEPS: STEPS, TOWNS: TOWNS, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine, summaryLine: summaryLine, retryLoad: retryLoad, waitScreen: waitScreen };
 }
 
 // ---- the page ----
@@ -257,6 +278,9 @@ if (typeof document !== "undefined") (function () {
     if (load.status !== "idle") return;
     load = { status: "loading" };
     var pack = new Promise(function (ok, no) {
+      if (window.KiwiPack) return ok(window.KiwiPack); // a retry after only the data failed
+      var old = document.querySelector('script[src="/plan/pack.js"]');
+      if (old) old.remove(); // a retry after the script failed: one tag at a time
       var s = document.createElement("script");
       s.src = "/plan/pack.js";
       s.onload = function () { if (window.KiwiPack) ok(window.KiwiPack); else no(new Error("pack")); };
@@ -279,11 +303,8 @@ if (typeof document !== "undefined") (function () {
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function town(id) { return TOWNS.filter(function (t) { return t.id === id; })[0]; }
   function areaName(id) { var t = load.data && load.data.towns[id]; return t ? t.name : id; }
-  function labelOf(list, id) { return list.filter(function (x) { return x.id === id; })[0].label; }
   function go(step) { if (location.hash === "#" + step) render(); else location.hash = "#" + step; }
   function days(n) { return n + (n === 1 ? " day" : " days"); }
-  function and(list, word) { return list.length < 2 ? list.join("") : list.slice(0, -1).join(", ") + " " + (word || "and") + " " + list[list.length - 1]; }
-  function overlaps(a, b) { return (a || []).some(function (x) { return (b || []).indexOf(x) >= 0; }); }
   function startMonth() { return +startDateFor(st, new Date()).slice(5, 7) - 1; }
   function offered() { return activitiesFor(load.data, startMonth()); }
 
@@ -300,7 +321,7 @@ if (typeof document !== "undefined") (function () {
         return Object.assign({}, o, { days: o.days.map(function (d) {
           return Object.assign({}, d, { items: d.items.map(function (it) {
             var p = places[it.siteId] || {};
-            return Object.assign({}, it, { thumb: p.thumb, fallback: p.fallback, category: p.category || [], vibe: p.vibe || [], activities: p.activities || [] });
+            return Object.assign({}, it, { thumb: p.thumb, fallback: p.fallback, category: p.category || [], activities: p.activities || [] });
           }) });
         }) });
       }) };
@@ -334,12 +355,8 @@ if (typeof document !== "undefined") (function () {
     }).join("") + '<button type="button" class="q-cta q-next" data-act="picked" data-val="' + key + '">Next</button>';
   }
   function photoBreak(b) {
-    return '<div class="q-brk"><img src="' + esc(b.img) + '" alt=""><div class="q-brk-text"><h1 class="q-brk-line" tabindex="-1">' + esc(b.line) + "</h1>" +
+    return '<div class="q-brk' + (b.card ? " q-brk-card" : "") + '"><img src="' + esc(b.img) + '" alt=""><div class="q-brk-text"><h1 class="q-brk-line" tabindex="-1">' + esc(b.line) + "</h1>" +
       (b.credit ? "<small>" + esc(b.credit) + "</small>" : "") + '<button type="button" class="q-kiwi" data-act="next">Next</button></div></div>';
-  }
-  function waitScreen(state) {
-    return state === "error" ? '<h1 tabindex="-1">Something went wrong</h1><p>The trips would not load. Try again, or <a href="/#trips">see the suggested trips</a>.</p>'
-      : '<p class="q-kicker">One moment</p><h1 tabindex="-1">Picking the places that fit you…</h1>';
   }
   function whenLabel() {
     return st.month ? MONTH_NAMES[st.month.month] + " " + st.month.year : st.season && st.season !== "unsure" ? labelOf(SEASONS, st.season) : "";
@@ -408,19 +425,12 @@ if (typeof document !== "undefined") (function () {
     },
     reveal: function () {
       var t = thisTrip(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
-      var likes = function (i) { return overlaps(st.vibes, i.vibe) || overlaps(st.into, i.category) || overlaps(acts, i.activities); };
-      var n = 0;
-      t.days.forEach(function (d) { d.items.forEach(function (i) { if (likes(i)) n++; }); });
-      var parts = [labelOf(PACES, st.pace), "up to " + st.drive / 60 + " h driving"];
-      if (st.vibes.length) parts.push(and(st.vibes.map(function (v) { return labelOf(VIBES, v); })));
-      parts.push(st.food ? "food tips on" : "no food tips");
-      acts.forEach(function (a) { parts.push(labelOf(ACTIVITIES, a).toLowerCase()); });
       var missing = t.missing.map(function (a) { return labelOf(ACTIVITIES, a).toLowerCase(); });
       var prev = t.start;
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when">From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + " · " + days(t.days.length) + " · " + (w ? w + " · dates" : "Dates") + " to set in the app</p>" +
         '<div class="q-actions"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>' +
-        '<p class="q-match">' + (t.kind === "built" ? "Built for you: " : "Hand-checked trip: ") + esc(parts.join(" · ")) + "." + (n ? " " + n + (n === 1 ? " stop" : " stops") + " you’ll like." : "") + "</p>" +
+        '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
         (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
         '<div class="q-days">' + t.days.map(function (d, k) {
           var from = prev; prev = d.town;
@@ -430,11 +440,10 @@ if (typeof document !== "undefined") (function () {
           if (d.overLimit) h += '<p class="q-warn"><b>Long drive.</b> ' + esc(driveLine(load.minutes[d.block], st.drive)) + "</p>";
           var notes = "";
           h += "<ul>" + d.items.map(function (i) {
-            var m = likes(i);
             acts.forEach(function (a) { if (i.activities.indexOf(a) >= 0) notes += '<p class="q-act">' + esc(labelOf(ACTIVITIES, a) + ": " + i.siteName + ", " + i.timeLabel) + "</p>"; });
-            return '<li class="q-stop' + (m ? " q-liked" : "") + '">' +
+            return '<li class="q-stop">' +
               (stopPhoto(i) ? '<img src="' + esc(stopPhoto(i)) + '" alt="" width="56" height="56" loading="lazy">' : '<span class="q-noimg">' + esc(i.category[0] || "") + "</span>") +
-              "<div><p>" + esc(i.siteName) + "</p><small>" + esc(i.timeLabel + " · " + i.durationLabel) + "</small></div>" + (m ? '<b class="q-youliked">You liked</b>' : "") + "</li>";
+              "<div><p>" + esc(i.siteName) + "</p><small>" + esc(i.timeLabel + " · " + i.durationLabel) + "</small></div></li>";
           }).join("") + "</ul>" + notes + "</section>";
           return h;
         }).join("") + "</div>" +
@@ -567,6 +576,7 @@ if (typeof document !== "undefined") (function () {
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();
     else if (act === "retry") doSave();
+    else if (act === "reload") { load = retryLoad(load); render(); }
     else if (act === "replace") doReplace();
     else if (act === "keep") keepIt();
   });

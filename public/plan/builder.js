@@ -49,26 +49,29 @@ function prepare(data) {
   return ctx;
 }
 
-// The fewest free days needed to reach a target town in exactly r more days: need[r][town] (missing = can't).
+// The fewest free days needed to reach a target town in exactly r more days (missing = can't), never two free days
+// in a row: need.any[r][town] when today may be free, need.after[r][town] when yesterday was free (so today can't be).
 function freeNeeded(ctx, towns, targets, days, allowed, freeOk) {
-  var need = [{}];
-  targets.forEach(function (t) { need[0][t] = 0; });
+  var any = [{}], after = [{}];
+  targets.forEach(function (t) { any[0][t] = after[0][t] = 0; });
   for (var r = 1; r <= days; r++) {
-    need[r] = {};
+    any[r] = {}; after[r] = {};
     for (var i = 0; i < towns.length; i++) {
-      var t = towns[i], best = freeOk(t) && need[r - 1][t] !== undefined ? need[r - 1][t] + 1 : Infinity;
+      var t = towns[i], drive = Infinity;
       (ctx.out[t] || []).forEach(function (b) {
-        if (allowed(b) && need[r - 1][b.endTown] !== undefined) best = Math.min(best, need[r - 1][b.endTown]);
+        if (allowed(b) && any[r - 1][b.endTown] !== undefined) drive = Math.min(drive, any[r - 1][b.endTown]);
       });
-      if (best < Infinity) need[r][t] = best;
+      var best = freeOk(t) && after[r - 1][t] !== undefined ? Math.min(drive, after[r - 1][t] + 1) : drive;
+      if (drive < Infinity) after[r][t] = drive;
+      if (best < Infinity) any[r][t] = best;
     }
   }
-  return need;
+  return { any: any, after: after };
 }
 function freeCap(days) { return Math.floor(days / 4); }
 
 // The best route of exactly ans.days days from ans.start to one of `targets`, as a beam search over the blocks.
-// mode 0: within the drive limit, at most a quarter of the days free, in towns that have a town day;
+// mode 0: within the drive limit, at most a quarter of the days free and never two in a row, in towns that have a town day;
 // 1: any drive; 2 (last resort): free days anywhere, no cap.
 function search(ctx, ans, targets, mode, pts) {
   var limit = ans.drive, n = ans.days, start = ans.start, cap = mode === 2 ? n : freeCap(n);
@@ -76,19 +79,22 @@ function search(ctx, ans, targets, mode, pts) {
   var freeOk = function (t) { return mode === 2 || !!ctx.stays[t]; };
   var towns = Object.keys(ctx.out).concat(targets, [start]);
   var need = freeNeeded(ctx, towns, targets, n, allowed, freeOk);
-  var can = function (r, town, free) { return need[r][town] !== undefined && free + need[r][town] <= cap; };
-  if (!can(n, start, 0)) return null;
-  var states = [{ town: start, cost: 0, key: "", seq: [], uses: new Uint8Array(ctx.blocks.length), mask: new Uint32Array(ctx.words), seen: "|" + start + "|", last: null, prevBlock: null, home: 0, free: 0 }];
+  var can = function (r, town, free, wasFree) {
+    var t = (wasFree ? need.after : need.any)[r];
+    return t[town] !== undefined && free + t[town] <= cap;
+  };
+  if (!can(n, start, 0, false)) return null;
+  var states = [{ town: start, cost: 0, key: "", seq: [], uses: new Uint8Array(ctx.blocks.length), mask: new Uint32Array(ctx.words), seen: "|" + start + "|", last: null, prevBlock: null, home: 0, free: 0, wasFree: false }];
   for (var day = 0; day < n; day++) {
     var rem = n - day - 1, next = [];
     states.forEach(function (s) {
       var moves = [], fresh = false;
       (ctx.out[s.town] || []).forEach(function (b) {
-        if (!allowed(b) || s.uses[b.ix] >= 2 || b === s.last || !can(rem, b.endTown, s.free)) return;
+        if (!allowed(b) || s.uses[b.ix] >= 2 || b === s.last || !can(rem, b.endTown, s.free, false)) return;
         moves.push(b);
         if (!s.uses[b.ix]) fresh = true;
       });
-      if (freeOk(s.town) && can(rem, s.town, s.free + 1)) { moves.push(null); fresh = true; }
+      if (freeOk(s.town) && !s.wasFree && can(rem, s.town, s.free + 1, true)) { moves.push(null); fresh = true; } // never two free days in a row
       moves.forEach(function (b) {
         if (b && fresh && s.uses[b.ix]) return; // a block again only when nothing else is left
         next.push(step(ctx, ans, s, b, pts));
@@ -109,7 +115,7 @@ function search(ctx, ans, targets, mode, pts) {
 function cheaper(a, b) { return a.cost - b.cost || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); }
 
 function step(ctx, ans, s, b, pts) {
-  var t = { town: s.town, cost: s.cost, key: s.key + "|" + (b ? b.id : "~"), seq: s.seq.concat([b]), uses: s.uses, mask: s.mask, seen: s.seen, last: b, prevBlock: s.prevBlock, home: s.home, free: s.free };
+  var t = { town: s.town, cost: s.cost, key: s.key + "|" + (b ? b.id : "~"), seq: s.seq.concat([b]), uses: s.uses, mask: s.mask, seen: s.seen, last: b, prevBlock: s.prevBlock, home: s.home, free: s.free, wasFree: !b };
   if (!b) { t.cost += COST.free; t.free++; return t; }
   t.town = b.endTown;
   t.uses = s.uses.slice(); t.uses[b.ix]++;

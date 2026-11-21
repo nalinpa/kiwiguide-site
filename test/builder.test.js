@@ -35,7 +35,7 @@ const freeCap = (days) => Math.floor(days / 4);
 const foodOnly = (p) => p.category.length === 1 && p.category[0] === "Food";
 
 // A route of exactly `days` days within the drive limit, by the builder's rules: blocks within the limit,
-// each at most twice and never two days running; at most freeCap(days) free days, each in a town that has a
+// each at most twice and never two days running; at most freeCap(days) free days, never two in a row, each in a town that has a
 // town day (a block that starts and ends there); ending in any start city. Depth-first, memoised dead ends.
 function withinLimitRouteExists(start, days, drive) {
   const cap = freeCap(days), blocks = data.blocks.filter((b) => b.driveMinutes <= drive), dead = new Set();
@@ -43,7 +43,7 @@ function withinLimitRouteExists(start, days, drive) {
     if (!left) return data.starts.includes(town);
     const key = [town, left, free, last, JSON.stringify(uses)].join("|");
     if (dead.has(key)) return false;
-    if (stays.has(town) && free < cap && go(town, left - 1, free + 1, null, uses)) return true;
+    if (stays.has(town) && free < cap && last !== "~free" && go(town, left - 1, free + 1, "~free", uses)) return true;
     for (const b of blocks) {
       if (b.startTown !== town || b.id === last || (uses[b.id] || 0) >= 2) continue;
       if (go(b.endTown, left - 1, free, b.id, { ...uses, [b.id]: (uses[b.id] || 0) + 1 })) return true;
@@ -86,6 +86,11 @@ test("days chain", () => {
 test("free days: at most a quarter of the trip", () => {
   for (const { answers, options } of sweep) for (const o of options)
     assert.ok(o.days.filter((d) => d.free).length <= freeCap(answers.days), `${name(answers)} ${o.key}`);
+});
+
+test("free days: never two in a row", () => {
+  for (const { answers, options } of sweep) for (const o of options)
+    o.days.forEach((d, i) => assert.ok(!(d.free && i && o.days[i - 1].free), `${name(answers)} ${o.key} days ${i} and ${i + 1}`));
 });
 
 test("the app would not move a thing", () => {

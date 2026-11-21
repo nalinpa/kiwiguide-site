@@ -5,6 +5,10 @@
 {
   "name": "kiwiguide",
   "compatibility_date": "2026-10-01",
+  // Branch previews: `npx wrangler versions upload` prints a private-ish preview URL on
+  // workers.dev. The live site itself stays only on the custom domains below.
+  "workers_dev": false,
+  "preview_urls": true,
   "main": "src/worker.js",
   "assets": { "directory": "./public", "run_worker_first": ["/go/*"] },
   "d1_databases": [

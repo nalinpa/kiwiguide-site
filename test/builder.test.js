@@ -1,0 +1,216 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+const require = createRequire(import.meta.url);
+const { buildTrips } = require("../public/plan/builder.js");
+const pack = require("../public/plan/pack.js");
+const data = JSON.parse(readFileSync(new URL("../public/plan/builder-data.json", import.meta.url), "utf8"));
+const lookup = (id) => data.places[id];
+const blockById = Object.fromEntries(data.blocks.map((b) => [b.id, b]));
+const base = { pace: "some", drive: 240, vibes: [], into: [], food: true, activities: [] };
+const ask = (a) => buildTrips(data, pack, { ...base, ...a });
+
+// The sweep: every start × length × drive × pace, food on and off; interests vary with the index.
+const LENGTHS = [3, 4, 7, 10, 14, 21];
+const INTERESTS = [
+  { vibes: ["nature", "relax"], into: ["Scenic", "Walks"], activities: ["hot-pools"] },
+  { vibes: [], into: [], activities: [] },
+  { vibes: ["adventure"], into: ["Adventure", "Water"], activities: ["surfing", "wildlife"] },
+];
+const sweep = [];
+let ms = 0;
+for (const start of data.starts) for (const days of LENGTHS) for (const drive of [120, 240, 360])
+  for (const pace of ["easy", "some", "hikes"]) for (const food of [true, false]) {
+    const answers = { start, days, drive, pace, food, ...INTERESTS[sweep.length % 3] };
+    const t0 = performance.now();
+    const options = buildTrips(data, pack, answers);
+    ms += performance.now() - t0;
+    sweep.push({ answers, options });
+  }
+const name = (a) => `${a.start} ${a.days}d ${a.drive} ${a.pace} food:${a.food}`;
+const stays = new Set(data.blocks.filter((b) => b.startTown === b.endTown).map((b) => b.startTown));
+
+// A route of exactly `days` days within the drive limit: blocks within it, free days in towns that
+// have a town day (a block that starts and ends there), ending in any start city.
+function withinLimitRouteExists(start, days, drive) {
+  let here = new Set([start]);
+  for (let i = 0; i < days; i++) {
+    const next = new Set();
+    for (const t of here) {
+      if (stays.has(t)) next.add(t);
+      for (const b of data.blocks) if (b.startTown === t && b.driveMinutes <= drive) next.add(b.endTown);
+    }
+    here = next;
+  }
+  return data.starts.some((s) => here.has(s));
+}
+
+test("every answer gets a trip", () => {
+  for (const { answers, options } of sweep) {
+    assert.ok(options.length >= 1 && options.length <= 3, name(answers));
+    for (const o of options) assert.equal(o.days.length, answers.days, name(answers) + " " + o.key);
+  }
+});
+
+test("days chain", () => {
+  for (const { answers, options } of sweep) for (const o of options) {
+    let at = answers.start;
+    assert.equal(o.start, answers.start);
+    for (const d of o.days) {
+      if (d.free) {
+        assert.equal(d.town, at, name(answers) + " " + o.key);
+        assert.deepEqual(d.items, []);
+        assert.ok(!d.overLimit);
+      } else {
+        const b = blockById[d.block];
+        assert.ok(b, o.key + " block " + d.block);
+        assert.equal(b.startTown, at, name(answers) + " " + o.key);
+        assert.equal(d.town, b.endTown);
+      }
+      at = d.town;
+    }
+    assert.equal(o.end, at);
+    assert.ok(data.starts.includes(o.end), o.key);
+  }
+});
+
+test("the app would not move a thing", () => {
+  for (const { answers, options } of sweep) for (const o of options) {
+    const out = pack.packTrip(o.days.map((d, i) => ({ id: "d" + i, items: d.items.map((it) => ({ ...it, id: it.siteId })) })), lookup);
+    out.forEach((d, i) => d.items.forEach((it, k) => {
+      const was = o.days[i].items[k];
+      assert.equal(it.slotIndex, was.slotIndex, `${name(answers)} ${o.key} day ${i + 1} ${it.siteId}`);
+      assert.ok(it.slotIndex + it.durationSlots <= 28, `${name(answers)} ${o.key} ${it.siteId} ends late`);
+      assert.equal(was.timeLabel, it.timeLabel);
+      assert.equal(was.durationLabel, it.durationLabel);
+    }));
+  }
+});
+
+test("no forbidden stops", () => {
+  for (const { answers, options } of sweep) for (const o of options) {
+    const seen = new Set();
+    for (const d of o.days) for (const it of d.items) {
+      assert.ok(data.places[it.siteId], it.siteId);
+      assert.ok(!seen.has(it.siteId), `${name(answers)} ${o.key} repeats ${it.siteId}`);
+      seen.add(it.siteId);
+      assert.deepEqual(Object.keys(it).sort(), ["durationLabel", "durationSlots", "siteId", "siteName", "slotIndex", "timeLabel"]);
+    }
+  }
+});
+
+test("food off", () => {
+  for (const { answers, options } of sweep) if (!answers.food) for (const o of options)
+    for (const d of o.days) for (const it of d.items) {
+      const c = data.places[it.siteId].category;
+      assert.ok(!(c.length === 1 && c[0] === "Food"), `${name(answers)} ${it.siteId}`);
+    }
+});
+
+test("drive limit", () => {
+  for (const { answers, options } of sweep) {
+    for (const o of options) for (const d of o.days) {
+      const over = !d.free && blockById[d.block].driveMinutes > answers.drive;
+      assert.equal(!!d.overLimit, over, `${name(answers)} ${o.key}`);
+    }
+    if (withinLimitRouteExists(answers.start, answers.days, answers.drive))
+      assert.ok(!options[0].days.some((d) => d.overLimit), name(answers) + " has a route within the limit");
+  }
+});
+
+test("suggested first", () => {
+  const want = data.templates.filter((t) => t.start === "queenstown" && t.blockIds.length === 10);
+  assert.equal(want.length, 3);
+  const options = ask({ start: "queenstown", days: 10, drive: 360 });
+  assert.deepEqual(options.map((o) => o.key), want.map((t) => t.key));
+  options.forEach((o, i) => {
+    assert.equal(o.kind, "suggested");
+    assert.equal(o.label, want[i].label);
+    assert.equal(o.end, want[i].end);
+    assert.deepEqual(o.days.map((d) => d.block), want[i].blockIds);
+  });
+});
+
+test("hand-checked days stay as they are when nothing is added or removed", () => {
+  const slim = (items) => items.map((it) => [it.siteId, it.slotIndex, it.durationSlots]);
+  for (const start of ["queenstown", "christchurch", "picton"]) for (const days of [3, 7, 10, 14, 21]) {
+    for (const o of ask({ start, days, drive: 360 })) if (o.kind === "suggested") {
+      const seen = new Set();
+      o.days.forEach((d, i) => {
+        const items = blockById[d.block].items;
+        // a stop an earlier day already had is dropped (never the same place twice), so that day is not as it was
+        if (!items.some((it) => seen.has(it.siteId))) assert.deepEqual(slim(d.items), slim(items), `${o.key} day ${i + 1}`);
+        items.forEach((it) => seen.add(it.siteId));
+      });
+    }
+  }
+});
+
+test("built trips are titled and keyed", () => {
+  const options = ask({ start: "dunedin", days: 12 });
+  assert.ok(options.length >= 1);
+  for (const o of options) {
+    assert.equal(o.kind, "built");
+    assert.equal(o.label, "South Island in 12 Days");
+    assert.equal(o.key, `built-dunedin-12-${o.end === "dunedin" ? "loop" : "oneway"}`);
+  }
+  assert.ok(options.filter((o) => o.end === "dunedin").length <= 1 && options.filter((o) => o.end !== "dunedin").length <= 1);
+});
+
+test("long slow trip from Invercargill", () => {
+  const [o] = ask({ start: "invercargill", days: 21, drive: 120 });
+  assert.equal(o.days.length, 21);
+  assert.ok(o.days.some((d) => d.free && d.items.length === 0));
+  o.days.forEach((d, i) => { if (i && !d.free) assert.notEqual(d.block, o.days[i - 1].block); });
+  const uses = {};
+  for (const d of o.days) if (!d.free) uses[d.block] = (uses[d.block] || 0) + 1;
+  assert.ok(Object.values(uses).every((n) => n <= 2));
+});
+
+test("never empty", () => {
+  const options = ask({ start: "nelson", days: 3, pace: "easy", drive: 120 });
+  assert.ok(options.length >= 1);
+  assert.equal(options[0].days.length, 3);
+  assert.ok(options[0].days.some((d) => d.items.length > 0));
+});
+
+test("activity not on route", () => {
+  assert.equal(Object.values(data.places).filter((p) => p.activities.includes("skiing")).length, 0);
+  const a = { start: "queenstown", days: 7, vibes: ["nature"], into: ["Scenic"] };
+  const without = ask(a);
+  const withSki = ask({ ...a, activities: ["skiing"] });
+  assert.equal(withSki.length, without.length);
+  withSki.forEach((o, i) => {
+    assert.deepEqual(o.missing, ["skiing"]);
+    assert.deepEqual(o.days, without[i].days);
+  });
+});
+
+test("missing lists exactly the picked activities no stop has", () => {
+  for (const { answers, options } of sweep) for (const o of options) {
+    const has = new Set(o.days.flatMap((d) => d.items.flatMap((it) => data.places[it.siteId].activities)));
+    assert.deepEqual(o.missing, answers.activities.filter((x) => !has.has(x)), name(answers));
+  }
+});
+
+test("pace: easy trims, big hikes adds long walks", () => {
+  const longWalks = (os) => os[0].days.flatMap((d) => d.items).filter((it) => {
+    const p = data.places[it.siteId]; return p.category.includes("Walks") && p.slots >= 4;
+  }).length;
+  const stops = (os) => os[0].days.reduce((n, d) => n + d.items.length, 0);
+  const a = { start: "christchurch", days: 14, drive: 360 };
+  assert.ok(stops(ask({ ...a, pace: "easy" })) < stops(ask(a)));
+  assert.ok(longWalks(ask({ ...a, pace: "hikes" })) > longWalks(ask(a)));
+});
+
+test("same answers, same trip", () => {
+  const a = { start: "dunedin", days: 12, pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Nature"], food: true, activities: ["hot-pools"] };
+  assert.deepEqual(buildTrips(data, pack, a), buildTrips(data, pack, a));
+});
+
+test("fast", () => {
+  const avg = ms / sweep.length;
+  console.log(`builder: ${sweep.length} calls, ${avg.toFixed(1)} ms average`);
+  assert.ok(avg < 50, avg + " ms");
+});

@@ -156,6 +156,112 @@ test("colours: the app's tokens, light and dark, as CSS custom properties", () =
   }
 });
 
+// A small cascade over styles.css, enough for the reveal's rows: rules by media, selectors of types, classes and
+// attributes with the descendant and child combinators (anything with a pseudo-class never matches), specificity then
+// order, colour inherited, backgrounds composited down to the page.
+const cssRules = (src, media = "") => {
+  const out = [];
+  for (let i = 0, open; (open = src.indexOf("{", i)) >= 0; ) {
+    let d = 1, j = open + 1;
+    while (d) d += src[j] === "{" ? 1 : src[j] === "}" ? -1 : 0, j++;
+    const pre = src.slice(i, open).trim(), body = src.slice(open + 1, j - 1);
+    if (pre.startsWith("@media")) out.push(...cssRules(body, pre));
+    else if (!pre.startsWith("@")) out.push({ media, sels: pre.split(","), body });
+    i = j;
+  }
+  return out;
+};
+const applies = (media, scheme, w) => [...media.matchAll(/\(([\w-]+):\s*([\w-]+)\)/g)].every(([, k, v]) =>
+  k === "min-width" ? w >= parseInt(v) : k === "max-width" ? w <= parseInt(v) : k === "prefers-color-scheme" && v === scheme);
+const domOf = (html) => {
+  const root = { tag: "", attrs: {}, kids: [] };
+  let cur = root;
+  for (const [, close, tag, attrs, self, text] of html.matchAll(/<(\/?)([a-z0-9]+)([^>]*?)(\/?)>|([^<]+)/gi)) {
+    if (text !== undefined) { if (text.trim()) cur.kids.push({ text }); }
+    else if (close) cur = cur.parent;
+    else {
+      const el = { tag, attrs: Object.fromEntries([...attrs.matchAll(/([\w-]+)(?:="([^"]*)")?/g)].map((a) => [a[1], a[2] ?? ""])), kids: [], parent: cur };
+      cur.kids.push(el);
+      if (!self && tag !== "img") cur = el;
+    }
+  }
+  return root;
+};
+const compound = (el, c) => {
+  const m = c.match(/^([a-z][\w-]*)?((?:\.[\w-]+|#[\w-]+|\[[^\]]*\])*)$/i);
+  if (!m || !el.tag || (m[1] && m[1] !== el.tag)) return false;
+  return (m[2].match(/\.[\w-]+|#[\w-]+|\[[^\]]*\]/g) || []).every((p) => p[0] === "." ? (el.attrs.class || "").split(" ").includes(p.slice(1))
+    : p[0] === "#" ? el.attrs.id === p.slice(1)
+    : (([, k, v]) => k in el.attrs && (v === undefined || el.attrs[k] === v))(p.match(/^\[([\w-]+)(?:="?([^"\]]*)"?)?\]$/)));
+};
+const matches = (el, sel) => {
+  const parts = sel.trim().replace(/\s*>\s*/g, " > ").split(/\s+/);
+  const at = (e, i) => {
+    if (!e || !compound(e, parts[i])) return false;
+    if (i === 0) return true;
+    if (parts[i - 1] === ">") return at(e.parent, i - 2);
+    for (let a = e.parent; a; a = a.parent) if (at(a, i - 1)) return true;
+    return false;
+  };
+  return at(el, parts.length - 1);
+};
+const specificity = (sel) => { const s = sel.replace(/\[[^\]]*\]/g, ".a"); return 1e4 * (s.match(/#/g) || []).length + 100 * (s.match(/\./g) || []).length + (s.match(/(^|[\s>])[a-z]/gi) || []).length; };
+const rgba = (v) => {
+  if (v[0] === "#") { const h = v.length === 4 ? [...v.slice(1)].map((c) => c + c).join("") : v.slice(1); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(1); }
+  const p = v.match(/[\d.]+/g).map(Number);
+  return [p[0], p[1], p[2], p[3] ?? 1];
+};
+const over = (top, under) => [0, 1, 2].map((i) => top[3] * top[i] + (1 - top[3]) * under[i]).concat(1);
+const lum = (c) => c.slice(0, 3).map((x) => (x /= 255) <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4).reduce((s, x, i) => s + x * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+function styleOf(css, scheme, w) {
+  const rules = cssRules(css.replace(/\/\*[\s\S]*?\*\//g, "")).filter((r) => applies(r.media, scheme, w));
+  const vars = Object.fromEntries(rules.filter((r) => r.sels.some((s) => s.trim() === ":root")).flatMap((r) => [...r.body.matchAll(/(--[\w-]+):\s*([^;]+)/g)].map((m) => [m[1], m[2].trim()])));
+  const value = (v) => v.replace(/var\((--[\w-]+)\)/g, (_, k) => value(vars[k]));
+  const declared = (el, prop) => {
+    let best;
+    for (const r of rules) {
+      const v = r.body.match(new RegExp("(?:^|;)\\s*" + prop + ":\\s*([^;]+)"));
+      if (v) for (const s of r.sels) if (matches(el, s) && (!best || specificity(s) >= best.k)) best = { k: specificity(s), v: value(v[1].trim()) };
+    }
+    return best && best.v;
+  };
+  const colour = (el) => { const v = declared(el, "color"); return !v || v === "inherit" ? colour(el.parent) : rgba(v); };
+  const bg = (el) => {
+    if (!el.tag) return [255, 255, 255, 1]; // the canvas, under the body's own paper
+    const v = declared(el, "background(?:-color)?"), under = bg(el.parent);
+    return !v || v === "none" || v === "transparent" ? under : over(rgba(v), under);
+  };
+  return { colour, bg };
+}
+
+test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (as the app's detailSelected)", () => {
+  const css = read("styles.css");
+  // every line a row can show: the long-drive day with an opening drive and "Runs past 10 PM" forced on, and a free day
+  const rows = TV.tripRows(dunedin, pack, lookup), n = dunedin.days.findIndex((d) => d.overLimit);
+  const all = { ...rows[n], overflows: true, warn: "About 5 h of driving. Over your 4 h limit." };
+  const free = TV.tripRows(inv, pack, lookup)[inv.days.findIndex((d) => d.free)];
+  assert.ok(all.opening && all.route && free.meta === "Nothing planned yet");
+  const seen = new Set(), low = [];
+  for (const scheme of ["light", "dark"]) for (const w of [375, 1024]) for (const open of [0, 1]) {
+    const S = styleOf(css, scheme, w);
+    const page = domOf('<html><body class="quiz"><main id="q" class="q-main"><div id="tv" class="q-days tv tv-on-trip"><div class="tv-trip">' + TV.renderTrip([all, free], open) + "</div></div></main></body></html>");
+    const els = [];
+    const walk = (e) => { els.push(e); e.kids.forEach((k) => k.kids && walk(k)); };
+    walk(page);
+    const row = els.find((e) => e.attrs["aria-current"] === "true");
+    // side by side, the open row is on selFill over the page (the test reads the real fill, not a copy of it)
+    if (w >= 1024) assert.deepEqual(S.bg(row).map(Math.round), over(rgba(pack.tokens.selFill[scheme]), S.bg(row.parent)).map(Math.round), "the open row's fill");
+    for (const el of els.filter((e) => e !== page && e.kids.some((k) => k.text) && (() => { for (let a = e; a; a = a.parent) if (a === row) return true; })())) {
+      const name = el.attrs.class || el.tag, b = S.bg(el), r = contrast(over(S.colour(el), b), b);
+      seen.add(name);
+      if (r < 4.5) low.push(`${scheme} ${w}px ${name} "${el.kids.filter((k) => k.text).map((k) => k.text).join("").trim()}" ${r.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual([...seen].sort(), ["b", "q-warn", "tv-date", "tv-meta", "tv-open", "tv-over", "tv-route"], "every kind of text a row shows was checked");
+  assert.deepEqual(low, [], "text under 4.5:1 on the open row");
+});
+
 test("icons: a self-hosted Lucide sprite with its licence, every icon the view uses", () => {
   const svg = read("img/icons.svg");
   assert.match(svg, /Lucide[\s\S]*ISC License/);

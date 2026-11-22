@@ -609,6 +609,10 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
   .tv-days { position: sticky; top: 0; max-height: calc(100dvh - 180px); overflow-y: auto; }
   .tv-row { align-items: center; gap: 12px; margin-top: 6px; padding: 8px; border-radius: 12px; }
   .tv-row[aria-current="true"] { background: var(--tv-selFill); }
+  /* Words on the open row's fill: muted words take text2, as the app's selected row (TripOverview detailSelected);
+     its warning words take the row's text colour, as no warm colour reaches 4.5:1 on the fill in both light and dark. */
+  .tv-row[aria-current="true"] .tv-meta { color: var(--tv-text2); }
+  .tv-row[aria-current="true"] .tv-over, .tv-row[aria-current="true"] .q-warn b { color: var(--tv-text); }
   .tv-pic { width: 56px; height: 56px; border-radius: 10px; }
   .tv-body { min-height: 0; padding-bottom: 0; border-bottom: 0; }
   .tv-route { min-height: 0; }

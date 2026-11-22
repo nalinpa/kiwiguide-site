@@ -328,6 +328,31 @@ if (typeof document !== "undefined") (function () {
     return cache.list;
   }
   function thisTrip() { var o = options(); return typeof o === "string" ? null : o.filter(function (x) { return x.key === st.pick; })[0] || null; }
+  // The reveal's trip as the app shows it (tripview.js): Trip | Days on a phone, both side by side from 1024px.
+  // Repainted on its own, so a tap on a day keeps the page where it is.
+  var tv = { pick: null, view: "trip", day: 0 };
+  function paintTrip() {
+    var el = document.getElementById("tv"), t = thisTrip(), P = load.pack, start = startDateFor(st, new Date());
+    var look = function (id) { return load.data.places[id]; };
+    t = Object.assign({}, t, { days: t.days.map(function (d, i) { return Object.assign({}, d, { date: addDays(start, i) }); }) }); // dated as tripBody dates the saved trip
+    var n = tv.day = TripView.clampDay(tv.day, t), rows = TripView.tripRows(t, P, look), row = rows[n];
+    rows.forEach(function (r) { r.warn = r.overLimit ? driveLine(r.overLimit, st.drive) : ""; });
+    el.className = "q-days tv tv-on-" + tv.view;
+    el.innerHTML = dots('<div class="tv-switch">' + ["trip", "days"].map(function (v) {
+      return '<button type="button" data-act="tv-view" data-val="' + v + '" aria-pressed="' + (tv.view === v) + '">' + (v === "trip" ? "Trip" : "Days") + "</button>";
+    }).join("") + "</div>" +
+      '<div class="tv-trip">' + TripView.renderTrip(rows, n) + "</div>" +
+      '<div class="tv-days"><div class="tv-tabs">' + t.days.map(function (d, i) {
+        return '<button type="button" class="tv-tab" data-act="tv-tab" data-val="' + i + '" aria-pressed="' + (i === n) + '">Day ' + (i + 1) +
+          "<small>" + esc(new Date(d.date + "T00:00:00").toLocaleDateString("en-NZ", { day: "numeric", month: "short" })) + "</small></button>";
+      }).join("") + "</div>" +
+      '<h2 class="tv-head"><span>' + esc(row.dateLabel) + "</span>" + (row.route ? "<b>" + esc(row.route) + "</b>" : "") + "</h2>" +
+      (row.warn ? '<p class="q-warn"><b>Long drive.</b> ' + esc(row.warn) + "</p>" : "") +
+      TripView.renderDay(TripView.dayView(t, n, P, look)) + "</div>");
+    TripView.place(el);
+    var tab = el.querySelector('.tv-tab[aria-pressed="true"]'), strip = tab.parentNode;
+    strip.scrollLeft = tab.offsetLeft - (strip.clientWidth - tab.offsetWidth) / 2; // the open day's tab in view, without moving the page
+  }
   function endLabel(t) { return t.end === t.start ? "Loop · back in " + areaName(t.start) : "Ends in " + areaName(t.end); }
   function routeLine(t) {
     var names = [areaName(t.start)];
@@ -425,29 +450,20 @@ if (typeof document !== "undefined") (function () {
     reveal: function () {
       var t = thisTrip(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
       var missing = t.missing.map(function (a) { return labelOf(ACTIVITIES, a).toLowerCase(); });
-      var prev = t.start;
+      // Where each picked activity is: one line per activity, naming its places and days.
+      var notes = acts.map(function (a) {
+        var at = [];
+        t.days.forEach(function (d, k) { d.items.forEach(function (i) { if (i.activities.indexOf(a) >= 0) at.push(i.siteName + " (Day " + (k + 1) + ")"); }); });
+        return at.length ? '<p class="q-act">' + esc(labelOf(ACTIVITIES, a) + ": " + at.join(", ")) + "</p>" : "";
+      }).join("");
+      if (tv.pick !== st.pick) tv = { pick: st.pick, view: "trip", day: tv.day }; // another trip opens on Trip; the open day stays if it has one (paintTrip clamps it)
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when">From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + " · " + days(t.days.length) + " · " + (w ? w + " · dates" : "Dates") + " to set in the app</p>" +
-        '<div class="q-actions"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>' +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
-        (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
-        '<div class="q-days">' + t.days.map(function (d, k) {
-          var from = prev; prev = d.town;
-          var title = d.free || from === d.town ? areaName(d.town) : areaName(from) + " → " + areaName(d.town);
-          var h = '<section class="q-day"><h2>Day ' + (k + 1) + " <span>· " + esc(title) + "</span></h2>";
-          if (d.free) return h + '<div class="q-free"><p>A free day in ' + esc(areaName(d.town)) + "</p><small>Nothing planned. Swim, sleep in, or pick something from Explore in the app.</small></div></section>";
-          if (d.overLimit) h += '<p class="q-warn"><b>Long drive.</b> ' + esc(driveLine(d.driveMinutes, st.drive)) + "</p>";
-          var notes = "";
-          h += "<ul>" + d.items.map(function (i) {
-            acts.forEach(function (a) { if (i.activities.indexOf(a) >= 0) notes += '<p class="q-act">' + esc(labelOf(ACTIVITIES, a) + ": " + i.siteName + ", " + i.timeLabel) + "</p>"; });
-            return '<li class="q-stop">' +
-              (stopPhoto(i) ? '<img src="' + esc(stopPhoto(i)) + '" alt="" width="56" height="56" loading="lazy">' : '<span class="q-noimg">' + esc(i.category[0] || "") + "</span>") +
-              "<div><p>" + esc(i.siteName) + "</p><small>" + esc(i.timeLabel + " · " + i.durationLabel) + "</small></div></li>";
-          }).join("") + "</ul>" + notes + "</section>";
-          return h;
-        }).join("") + "</div>" +
+        (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") + notes +
+        '<div id="tv" class="q-days tv"></div>' +
         (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
-        '<div class="q-actions"><button type="button" class="q-cta" data-act="save">Save this trip</button></div>';
+        '<div class="q-actions q-bottom"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>';
     },
     account: function () {
       var t = thisTrip();
@@ -510,6 +526,7 @@ if (typeof document !== "undefined") (function () {
     }
     draft = name === "days" ? st.days || 7 : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
     root.innerHTML = dots(screens[STEPS[step]]());
+    if (name === "reveal") paintTrip();
     painted(name);
   }
   function painted(name) {
@@ -569,6 +586,12 @@ if (typeof document !== "undefined") (function () {
       go(v === "vibes" ? S.break2 : v === "into" ? S.food : S.choice);
     }
     else if (act === "food") { answered("food", v); st.food = v === "yes"; st.pick = null; save(); go(S.activities); }
+    else if (act === "tv-view" || act === "tv-tab") { if (act === "tv-view") tv.view = v; else tv.day = +v; paintTrip(); root.querySelector('[data-act="' + act + '"][data-val="' + v + '"]').focus({ preventScroll: true }); }
+    else if (act === "tv-day") {
+      tv.day = +v; tv.view = "days"; paintTrip();
+      if (!matchMedia("(min-width: 1024px)").matches) document.getElementById("tv").scrollIntoView(); // a phone opens the day; side by side it just shows
+      else root.querySelector('[data-act="tv-day"][data-val="' + v + '"]').focus({ preventScroll: true });
+    }
     else if (act === "pick") { answered("choice", v); st.pick = v; save(); go(S.reveal); }
     else if (act === "again") { st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(S.account); }

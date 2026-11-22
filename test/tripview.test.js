@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
 const require = createRequire(import.meta.url);
 const TV = require("../public/plan/tripview.js");
 const { buildTrips } = require("../public/plan/builder.js");
@@ -34,7 +35,11 @@ test("rows match the app: date, route, places and driving, photo", () => {
     assert.equal(r.route, pack.routeLine(sum[i].areas.map(pack.areaName)));
     assert.equal(r.meta, appMeta(sum[i]));
     assert.equal(r.overflows, sum[i].overflows);
-    assert.equal(r.photo, dunedin.days[i].items.map(stopPhoto).filter(Boolean)[0] || "");
+    assert.equal(r.photo, (dunedin.days[i].items.find((it) => it.thumb) || {}).thumb || dunedin.days[i].items.map(stopPhoto).filter(Boolean)[0] || "");
+  });
+  // the first stop with its own photo, before a type default (the app's row never shows one)
+  for (const o of [dunedin, inv]) TV.tripRows(o, pack, lookup).forEach((r, i) => {
+    if (o.days[i].items.some((it) => it.thumb)) assert.ok(!r.photo.startsWith("/img/places/"), `day ${i + 1}: ${r.photo}`);
   });
   assert.equal(rows[0].dateLabel, "Day 1 · Fri 1 Jan");
   assert.match(rows[1].meta, /^\d+ places · [\d.]+ hours? driving$/);
@@ -63,6 +68,7 @@ test("free day: a row and a day view in the app's empty-day form", () => {
   assert.equal(row.route, pack.routeLine([pack.areaName(inv.days[n].town)]), "the town the traveller is in");
   assert.equal(row.photo, "");
   assert.match(TV.renderTrip([row]), /Nothing planned yet/);
+  assert.ok(TV.renderTrip([row]).includes(TV.nopic), "a photo that fails is swapped for this same pin (quiz.js)");
   let tl;
   assert.doesNotThrow(() => { tl = TV.dayView(inv, n, pack, lookup); });
   assert.equal(tl.filter((x) => x.kind === "stop").length, 0);
@@ -115,7 +121,11 @@ test("timeline: stops at their slots with the app's time range, a drive item per
   assert.equal(TV.iconFor(undefined), "map-pin");
   const html = TV.renderDay(TV.dayView(dunedin, 1, pack, lookup));
   assert.match(html, /data-slot="0" data-slots="1"><span>8 AM<\/span>/);
-  assert.match(html, /<use href="\/img\/icons\.svg#car"\/>/);
+  // the hour labels are only a scale (every stop and drive says its own time): a screen reader skips them
+  assert.deepEqual(html.match(/class="tv-hour"[^>]*/g).map((h) => h.includes('aria-hidden="true"')), Array(15).fill(true));
+  // the sprite by its content's version: /img/* is cached for 7 days without a check, so a changed sprite needs a new URL
+  const v = createHash("sha1").update(read("img/icons.svg").replace(/\r\n/g, "\n")).digest("hex").slice(0, 8);
+  assert.ok(html.includes(`<use href="/img/icons.svg?v=${v}#car"/>`), "icons.svg?v=" + v);
 });
 
 test("option switch: the open day is kept when it exists, else the last day", () => {
@@ -163,7 +173,8 @@ const cssRules = (src, media = "") => {
   const out = [];
   for (let i = 0, open; (open = src.indexOf("{", i)) >= 0; ) {
     let d = 1, j = open + 1;
-    while (d) d += src[j] === "{" ? 1 : src[j] === "}" ? -1 : 0, j++;
+    while (d && j < src.length) d += src[j] === "{" ? 1 : src[j] === "}" ? -1 : 0, j++;
+    if (d) throw new Error("unbalanced { in styles.css");
     const pre = src.slice(i, open).trim(), body = src.slice(open + 1, j - 1);
     if (pre.startsWith("@media")) out.push(...cssRules(body, pre));
     else if (!pre.startsWith("@")) out.push({ media, sels: pre.split(","), body });
@@ -235,6 +246,10 @@ function styleOf(css, scheme, w) {
   return { colour, bg };
 }
 
+test("cascade: an unbalanced { fails the run instead of hanging it", () => {
+  assert.throws(() => cssRules("a { b"), /unbalanced/);
+});
+
 test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (as the app's detailSelected)", () => {
   const css = read("styles.css");
   // every line a row can show: the long-drive day with an opening drive and "Runs past 10 PM" forced on, and a free day
@@ -252,6 +267,8 @@ test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (
     const row = els.find((e) => e.attrs["aria-current"] === "true");
     // side by side, the open row is on selFill over the page (the test reads the real fill, not a copy of it)
     if (w >= 1024) assert.deepEqual(S.bg(row).map(Math.round), over(rgba(pack.tokens.selFill[scheme]), S.bg(row.parent)).map(Math.round), "the open row's fill");
+    // its "Runs past 10 PM" keeps the app's warning colour in dark (4.73:1 there); light takes the text colour
+    if (w >= 1024 && open === 0) assert.deepEqual(S.colour(els.find((e) => e.attrs.class === "tv-over")), rgba(pack.tokens[scheme === "dark" ? "warning" : "text"][scheme]), scheme + " Runs past 10 PM");
     for (const el of els.filter((e) => e !== page && e.kids.some((k) => k.text) && (() => { for (let a = e; a; a = a.parent) if (a === row) return true; })())) {
       const name = el.attrs.class || el.tag, b = S.bg(el), r = contrast(over(S.colour(el), b), b);
       seen.add(name);
@@ -265,6 +282,12 @@ test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (
 test("icons: a self-hosted Lucide sprite with its licence, every icon the view uses", () => {
   const svg = read("img/icons.svg");
   assert.match(svg, /Lucide[\s\S]*ISC License/);
+  // the licences' own conditions: their permission notices ship with the icons (ISC, and MIT for the Feather-derived chevron-right)
+  const lic = read("img/icons-LICENSE.txt");
+  assert.match(lic, /Permission to use, copy, modify, and\/or distribute/);
+  assert.match(lic, /Cole Bemis/);
+  assert.match(svg, /<!--[^>]*\/img\/icons-LICENSE\.txt[^>]*-->/, "the sprite names the licence file");
+  for (const c of svg.match(/<!--[\s\S]*?-->/g)) assert.ok(!c.slice(4, -3).includes("--"), "no -- inside a comment, or the sprite stops parsing");
   const cats = ["Food", "Attractions", "Culture", "Walks", "Water", "Scenic", "Nature", "Adventure", "Stay", "other"];
   for (const id of [...cats.map((c) => TV.iconFor([c])), "car", "chevron-right"])
     assert.match(svg, new RegExp(`<symbol id="${id}" viewBox="0 0 24 24"`), id);
@@ -276,9 +299,29 @@ test("wired in: script tag before quiz.js, the reveal uses the view, no inline s
   assert.ok(html.indexOf('src="/plan/tripview.js"') > 0 && html.indexOf('src="/plan/tripview.js"') < html.indexOf('src="/plan/quiz.js"'));
   assert.match(src, /TripView\.tripRows\(/);
   assert.match(src, /TripView\.dayView\(/);
-  assert.ok(!/<script>/.test(html), "no inline script");
+  assert.ok(!/<script(?![^>]*\bsrc=)/i.test(html), "no inline script");
   const shown = [dunedin, inv].map((o) => TV.renderTrip(TV.tripRows(o, pack, lookup)) + o.days.map((_, n) => TV.renderDay(TV.dayView(o, n, pack, lookup))).join("")).join("");
-  assert.ok(!/Itinerar|Plans\b|Location/.test(shown), "Trip and place words only");
+  assert.ok(!/itinerar|\bplans\b|\blocations?\b/i.test(shown), "Trip and place words only");
+  // and the reveal's own words, which quiz.js writes (the switch, the tabs, the heading, the notes, any later line)
+  assert.deepEqual(src.match(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g).filter((s) => /itinerar|\bplans\b|\blocations?\b/i.test(s)), [], "Trip and place words in quiz.js");
+  // the trip view first on a phone's first screen; each activity's line after it
+  assert.match(src, /<div id="tv" class="q-days tv"><\/div>' \+ notes/);
+  // the open day is a named, focusable region, so a keyboard can scroll it side by side
+  assert.match(src, /class="tv-days" tabindex="0" role="region" aria-label="/);
+  // a day picked from another day's evening opens at its morning, under the strip
+  assert.match(src, /if \(act === "tv-tab"\) \{ var dv = root\.querySelector\("\.tv-days"\); if \(dv\.getBoundingClientRect\(\)\.top < root\.getBoundingClientRect\(\)\.top\) dv\.scrollIntoView\(\); \}/);
+  // a phone row tap leaves focus on the open day's tab, not the top of the page
+  assert.match(src, /scrollIntoView\(\); root\.querySelector\('\.tv-tab\[aria-pressed="true"\]'\)\.focus\(\{ preventScroll: true \}\);/);
+  // if the view can't paint (tripview.js lost on the way), the reveal says so and still finishes
+  assert.match(src, /if \(name === "reveal"\) try \{ paintTrip\(\); \} catch/);
+  // the layout repaints when it crosses the breakpoint (an iPad turned), with the same query as styles.css
+  const q = src.match(/var WIDE = matchMedia\("([^"]+)"\);/);
+  assert.ok(q && read("styles.css").includes("@media " + q[1] + " {"), "the breakpoint styles.css uses");
+  assert.match(src, /WIDE\.addEventListener\("change", /);
+  // Start again opens the next reveal on Trip
+  assert.match(src, /act === "again"\) \{ tv = \{ pick: null, view: "trip", day: 0 \};/);
+  // a row photo that fails becomes the free day's pin (no inline onerror: the CSP)
+  assert.match(src, /root\.addEventListener\("error", function \(e\) \{[^\n]*tv-pic[^\n]*TripView\.nopic[^\n]*\}, true\);/);
 });
 
 test("budget: everything the quiz loads is under 300 KB gzipped", () => {

@@ -8,9 +8,13 @@
   // as symbols in /img/icons.svg. Anything else gets the pin, as the app's "other".
   var ICON = { Food: "utensils", Attractions: "camera", Culture: "landmark", Walks: "footprints", Water: "waves", Scenic: "mountain-snow", Nature: "bird", Adventure: "zap", Stay: "bed-double" };
   var LAST_SLOT = 28; // 10 PM: the app's PLANNER.MAX_GRID_SLOTS, 30-minute slots from 8 AM
+  // /img/* is cached for 7 days without a check (_headers), so the sprite goes by its content's version: the first
+  // 8 hex of the sha1 of icons.svg with LF line endings (test/tripview.test.js recomputes it; change both together)
+  var SPRITE = "/img/icons.svg?v=108ca655";
 
   function iconFor(category) { return ICON[(category || [])[0]] || "map-pin"; }
-  function icon(id) { return '<svg class="tv-i" aria-hidden="true"><use href="/img/icons.svg#' + id + '"/></svg>'; }
+  function icon(id) { return '<svg class="tv-i" aria-hidden="true"><use href="' + SPRITE + "#" + id + '"/></svg>'; }
+  var NOPIC = '<span class="tv-pic tv-nopic">' + icon("map-pin") + "</span>"; // a row with no photo (quiz.js swaps a failed one for it)
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   // ponytail: the quiz's stopPhoto, a global once quiz.js has loaded in the page (it loads after this file, before any call)
   function photo(it) { return (typeof stopPhoto === "function" ? stopPhoto : require("./quiz.js").stopPhoto)(it); }
@@ -36,7 +40,8 @@
         opening: s.openingDrive ? "Starts with the drive from " + pack.areaName(s.openingDrive.fromArea) : null,
         overflows: s.overflows,
         overLimit: d.overLimit ? d.driveMinutes : 0,
-        photo: d.items.map(photo).filter(Boolean)[0] || "",
+        // the first stop with its own photo (the app's row never shows a type default), else the first default
+        photo: (d.items.filter(function (it) { return it.thumb; })[0] || {}).thumb || d.items.map(photo).filter(Boolean)[0] || "",
       };
     });
   }
@@ -68,7 +73,7 @@
   function renderTrip(rows, open) {
     return '<ol class="tv-list">' + rows.map(function (r, i) {
       return '<li><button type="button" class="tv-row" data-act="tv-day" data-val="' + i + '"' + (i === open ? ' aria-current="true"' : "") + ">" +
-        (r.photo ? '<img class="tv-pic" src="' + esc(r.photo) + '" alt="" width="72" height="72" loading="lazy">' : '<span class="tv-pic tv-nopic">' + icon("map-pin") + "</span>") +
+        (r.photo ? '<img class="tv-pic" src="' + esc(r.photo) + '" alt="" width="72" height="72" loading="lazy">' : NOPIC) +
         '<span class="tv-body"><span class="tv-main"><span class="tv-date">' + esc(r.dateLabel) + "</span>" +
         (r.route ? '<span class="tv-route">' + esc(r.route) + "</span>" : "") +
         '<span class="tv-meta">' + esc(r.meta) + "</span>" +
@@ -84,7 +89,8 @@
     var stops = timeline.some(function (x) { return x.kind === "stop"; });
     return '<div class="tv-grid">' + timeline.map(function (x) {
       var at = ' data-slot="' + x.slot + '" data-slots="' + x.slots + '">';
-      if (x.kind === "hour") return '<div class="tv-hour"' + at + "<span>" + esc(x.label) + "</span></div>";
+      // the hour lines are only a scale (each stop and drive says its own time), so a screen reader skips them
+      if (x.kind === "hour") return '<div class="tv-hour" aria-hidden="true"' + at + "<span>" + esc(x.label) + "</span></div>";
       if (x.kind === "stop") return '<div class="tv-stop"' + at + icon(x.icon) + "<span><b>" + esc(x.name) + "</b><small>" + esc(x.time) + "</small></span></div>";
       if (!x.detail) return '<div class="tv-hop"' + at + icon("car") + esc(x.title) + "</div>";
       return '<div class="tv-drv"' + at + icon("car") + "<span><b>" + esc(x.title) + "</b>" + (x.via ? "<small>" + esc(x.via) + "</small>" : "") + "<small>" + esc(x.detail) + "</small></span></div>";
@@ -97,7 +103,7 @@
     });
   }
 
-  var api = { iconFor: iconFor, slotRangeLabel: slotRangeLabel, tripRows: tripRows, dayTimeline: dayTimeline, dayView: dayView, clampDay: clampDay, renderTrip: renderTrip, renderDay: renderDay, place: place };
+  var api = { iconFor: iconFor, slotRangeLabel: slotRangeLabel, tripRows: tripRows, dayTimeline: dayTimeline, dayView: dayView, clampDay: clampDay, renderTrip: renderTrip, renderDay: renderDay, place: place, nopic: NOPIC };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else window.TripView = api;
 })();

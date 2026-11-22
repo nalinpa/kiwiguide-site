@@ -331,6 +331,7 @@ if (typeof document !== "undefined") (function () {
   // The reveal's trip as the app shows it (tripview.js): Trip | Days on a phone, both side by side from 1024px.
   // Repainted on its own, so a tap on a day keeps the page where it is.
   var tv = { pick: null, view: "trip", day: 0 };
+  var WIDE = matchMedia("(min-width: 1024px)"); // side by side: the same query as styles.css
   function paintTrip() {
     var el = document.getElementById("tv"), t = thisTrip(), P = load.pack, start = startDateFor(st, new Date());
     var look = function (id) { return load.data.places[id]; };
@@ -342,7 +343,8 @@ if (typeof document !== "undefined") (function () {
       return '<button type="button" data-act="tv-view" data-val="' + v + '" aria-pressed="' + (tv.view === v) + '">' + (v === "trip" ? "Trip" : "Days") + "</button>";
     }).join("") + "</div>" +
       '<div class="tv-trip">' + TripView.renderTrip(rows, n) + "</div>" +
-      '<div class="tv-days"><div class="tv-tabs">' + t.days.map(function (d, i) {
+      // a tab stop of its own, so a keyboard can scroll the side by side day (WebKit gives a scroller none)
+      '<div class="tv-days" tabindex="0" role="region" aria-label="' + esc(row.dateLabel) + '"><div class="tv-tabs">' + t.days.map(function (d, i) {
         return '<button type="button" class="tv-tab" data-act="tv-tab" data-val="' + i + '" aria-pressed="' + (i === n) + '">Day ' + (i + 1) +
           "<small>" + esc(new Date(d.date + "T00:00:00").toLocaleDateString("en-NZ", { day: "numeric", month: "short" })) + "</small></button>";
       }).join("") + "</div>" +
@@ -450,7 +452,7 @@ if (typeof document !== "undefined") (function () {
     reveal: function () {
       var t = thisTrip(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
       var missing = t.missing.map(function (a) { return labelOf(ACTIVITIES, a).toLowerCase(); });
-      // Where each picked activity is: one line per activity, naming its places and days.
+      // Where each picked activity is: one line per activity, naming its places and days, after the trip (so Day 1 is on a phone's first screen).
       var notes = acts.map(function (a) {
         var at = [];
         t.days.forEach(function (d, k) { d.items.forEach(function (i) { if (i.activities.indexOf(a) >= 0) at.push(i.siteName + " (Day " + (k + 1) + ")"); }); });
@@ -460,8 +462,8 @@ if (typeof document !== "undefined") (function () {
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when">From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + " · " + days(t.days.length) + " · " + (w ? w + " · dates" : "Dates") + " to set in the app</p>" +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
-        (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") + notes +
-        '<div id="tv" class="q-days tv"></div>' +
+        (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
+        '<div id="tv" class="q-days tv"></div>' + notes +
         (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
         '<div class="q-actions q-bottom"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>';
     },
@@ -526,7 +528,8 @@ if (typeof document !== "undefined") (function () {
     }
     draft = name === "days" ? st.days || 7 : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
     root.innerHTML = dots(screens[STEPS[step]]());
-    if (name === "reveal") paintTrip();
+    // tripview.js lost on the way (one dropped request): say so; the screen still finishes, and Save still builds the trip
+    if (name === "reveal") try { paintTrip(); } catch (e) { document.getElementById("tv").innerHTML = '<p class="q-error">Your days would not show. Reload the page to see them.</p>'; }
     painted(name);
   }
   function painted(name) {
@@ -558,6 +561,9 @@ if (typeof document !== "undefined") (function () {
     });
   }
   root.addEventListener("input", function (e) { if (e.target.id === "q-range") setDays(+e.target.value); });
+  // A row photo that fails (a dead thumb) becomes the free day's pin, not an empty frame. Error events don't bubble, so this
+  // listens on the way down; the CSP allows no inline onerror.
+  root.addEventListener("error", function (e) { if (e.target.matches("img.tv-pic")) e.target.outerHTML = TripView.nopic; }, true);
 
   root.addEventListener("click", function (e) {
     if (e.target.closest("a.badge")) track("app_store_click", { trip: st.pick });
@@ -586,14 +592,21 @@ if (typeof document !== "undefined") (function () {
       go(v === "vibes" ? S.break2 : v === "into" ? S.food : S.choice);
     }
     else if (act === "food") { answered("food", v); st.food = v === "yes"; st.pick = null; save(); go(S.activities); }
-    else if (act === "tv-view" || act === "tv-tab") { if (act === "tv-view") tv.view = v; else tv.day = +v; paintTrip(); root.querySelector('[data-act="' + act + '"][data-val="' + v + '"]').focus({ preventScroll: true }); }
+    else if (act === "tv-view" || act === "tv-tab") {
+      if (act === "tv-view") tv.view = v; else tv.day = +v;
+      paintTrip();
+      // a day picked from another day's evening opens at its morning, under the strip (the app's phone shows a new day from its top)
+      if (act === "tv-tab") { var dv = root.querySelector(".tv-days"); if (dv.getBoundingClientRect().top < root.getBoundingClientRect().top) dv.scrollIntoView(); }
+      root.querySelector('[data-act="' + act + '"][data-val="' + v + '"]').focus({ preventScroll: true });
+    }
     else if (act === "tv-day") {
       tv.day = +v; tv.view = "days"; paintTrip();
-      if (!matchMedia("(min-width: 1024px)").matches) document.getElementById("tv").scrollIntoView(); // a phone opens the day; side by side it just shows
-      else root.querySelector('[data-act="tv-day"][data-val="' + v + '"]').focus({ preventScroll: true });
+      // side by side the day just shows; a phone opens it, with focus on its tab rather than the top of the page
+      if (WIDE.matches) root.querySelector('[data-act="tv-day"][data-val="' + v + '"]').focus({ preventScroll: true });
+      else { document.getElementById("tv").scrollIntoView(); root.querySelector('.tv-tab[aria-pressed="true"]').focus({ preventScroll: true }); }
     }
     else if (act === "pick") { answered("choice", v); st.pick = v; save(); go(S.reveal); }
-    else if (act === "again") { st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
+    else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(S.account); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();
@@ -717,6 +730,13 @@ if (typeof document !== "undefined") (function () {
   });
 
   window.addEventListener("hashchange", render);
+  // Across the breakpoint (an iPad turned, a window resized) the view repaints, so the strip finds the open day's tab,
+  // and a phone's Days starts at the top of the trip, not mid-timeline. (Safari 14+; an older one just doesn't repaint.)
+  if (WIDE.addEventListener) WIDE.addEventListener("change", function (e) {
+    if (!document.querySelector("#tv .tv-days")) return; // not on the reveal, or its days would not show
+    paintTrip();
+    if (!e.matches && tv.view === "days") document.getElementById("tv").scrollIntoView();
+  });
 
   // Back from Google (and not already saved): the sign-in finishes once the trip is built again.
   var googlePending = gfrag && !savedInfo();

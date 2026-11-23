@@ -18,6 +18,10 @@ const base = { pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Sce
 const dated = (o, start) => ({ ...o, days: o.days.map((d, i) => ({ ...d, date: tripBody(o, start, String).days[i].date, items: d.items.map((it) => ({ ...it, thumb: lookup(it.siteId).thumb, fallback: lookup(it.siteId).fallback })) })) });
 const dunedin = dated(buildTrips(data, pack, { ...base, start: "dunedin", days: 12 })[0], "2027-01-01");
 const inv = dated(buildTrips(data, pack, { ...base, start: "invercargill", days: 21 })[0], "2027-01-01");
+// A trip with a day left empty: rest days are spent in their town or out to a nearby one (owner, 2026-11-24), but on day 17
+// of Christchurch to Queenstown in 18 days at 2 hours a day every Wānaka place is already in the trip, and Queenstown is too
+// far there and back. The next day opens with the drive from Wānaka.
+const rest = dated(buildTrips(data, pack, { ...base, start: "christchurch", days: 18, drive: 120, food: false })[0], "2027-01-01");
 // The app's days as TripOverview gets them: an id on every day and item.
 const appDays = (o) => o.days.map((d, i) => ({ id: "day_" + (i + 1), date: d.date, items: d.items.map((it, k) => ({ ...it, id: i + "_" + k })) }));
 // The app's dayStartSiteId: the last stop of the last earlier day that has one.
@@ -61,23 +65,24 @@ test("opening drive: 'Starts with the drive from <town>' exactly when tripSummar
 });
 
 test("free day: a row and a day view in the app's empty-day form", () => {
-  const n = inv.days.findIndex((d) => d.free);
-  assert.ok(n > 0, "Invercargill 21 days has a free day");
-  const row = TV.tripRows(inv, pack, lookup)[n];
+  const n = rest.days.findIndex((d) => d.free);
+  assert.ok(n > 0 && n < rest.days.length - 1, "Christchurch to Queenstown in 18 days has an empty day");
+  const row = TV.tripRows(rest, pack, lookup)[n];
   assert.equal(row.meta, "Nothing planned yet");
-  assert.equal(row.route, pack.routeLine([pack.areaName(inv.days[n].town)]), "the town the traveller is in");
+  assert.equal(row.route, pack.routeLine([pack.areaName(rest.days[n].town)]), "the town the traveller is in");
   assert.equal(row.photo, "");
   assert.match(TV.renderTrip([row]), /Nothing planned yet/);
   assert.ok(TV.renderTrip([row]).includes(TV.nopic), "a photo that fails is swapped for this same pin (quiz.js)");
   let tl;
-  assert.doesNotThrow(() => { tl = TV.dayView(inv, n, pack, lookup); });
+  assert.doesNotThrow(() => { tl = TV.dayView(rest, n, pack, lookup); });
   assert.equal(tl.filter((x) => x.kind === "stop").length, 0);
   assert.equal(tl.filter((x) => x.kind === "hour").length, 15);
   assert.match(TV.renderDay(tl), /Nothing here yet/);
   // the day after it still opens with the drive from where the traveller last was (dayStartSiteId skips the free day)
-  const sum = pack.tripSummary(appDays(inv), lookup);
-  const opening = TV.dayView(inv, n + 1, pack, lookup).filter((x) => x.kind === "drive" && x.title.startsWith("Drive to") && x.slot === 0);
+  const sum = pack.tripSummary(appDays(rest), lookup);
+  const opening = TV.dayView(rest, n + 1, pack, lookup).filter((x) => x.kind === "drive" && x.title.startsWith("Drive to") && x.slot === 0);
   assert.equal(opening.length, sum[n + 1].openingDrive ? 1 : 0);
+  assert.ok(sum[n + 1].openingDrive, "the day after opens with a drive");
 });
 
 test("timeline: stops at their slots with the app's time range, a drive item per leg, hour lines 8 AM to 10 PM", () => {
@@ -255,7 +260,7 @@ test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (
   // every line a row can show: the long-drive day with an opening drive and "Runs past 10 PM" forced on, and a free day
   const rows = TV.tripRows(dunedin, pack, lookup), n = dunedin.days.findIndex((d) => d.overLimit);
   const all = { ...rows[n], overflows: true, warn: "About 5 h of driving. Over your 4 h limit." };
-  const free = TV.tripRows(inv, pack, lookup)[inv.days.findIndex((d) => d.free)];
+  const free = TV.tripRows(rest, pack, lookup)[rest.days.findIndex((d) => d.free)];
   assert.ok(all.opening && all.route && free.meta === "Nothing planned yet");
   const seen = new Set(), low = [];
   for (const scheme of ["light", "dark"]) for (const w of [375, 1024]) for (const open of [0, 1]) {

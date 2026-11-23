@@ -2,23 +2,64 @@
 // The pure functions at the top are tested (test/quiz.test.js); the page code at the bottom only runs in a browser.
 
 var PHOTO = "https://api.blacksands.app/images/southislandguide/";
-// fact: the first photo break's line, true of the town itself (never a place the route may skip)
+// fact: the first photo break's line, after "<Town>, <N> days." (the owner's words, 2026-11-23)
 var TOWNS = [
-  { id: "queenstown", name: "Queenstown", sub: "Fly in to the lakes and mountains, with Wānaka and Milford Sound close by.", fact: "The world’s first commercial bungy jump opened here, off the Kawarau Bridge, in 1988.", img: PHOTO + "a6904a0d-2c8e-4f25-b533-e51241d6665e.webp" },
-  { id: "christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", fact: "Its Botanic Gardens have grown beside the Avon River since 1863.", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
-  { id: "picton", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", fact: "The Cook Strait ferries from Wellington dock right in town.", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
+  { id: "queenstown", out: "Fly out of Queenstown", name: "Queenstown", sub: "Fly in to the lakes and mountains, with Wānaka and Milford Sound close by.", fact: "Lake and mountains in every direction and more adventure than you could pack into a month.", img: PHOTO + "a6904a0d-2c8e-4f25-b533-e51241d6665e.webp" },
+  { id: "christchurch", out: "Fly out of Christchurch", name: "Christchurch", sub: "Fly in to the Garden City, then inland to Tekapo and Mount Cook or up the coast to Kaikōura.", fact: "A garden city with fresh energy, great food and a lively bar scene, and the beach and the Port Hills both close by.", img: PHOTO + "2f5a12e0-dfbc-4fcd-a7bc-f86ca3e0e0dd.webp" },
+  { id: "picton", out: "Take the ferry back to Wellington", name: "Picton", sub: "Off the ferry from Wellington, into the Marlborough Sounds, Nelson and Abel Tasman.", fact: "A laid-back harbour town at the edge of the Marlborough Sounds with boat trips, bush walks and wineries close by.", img: PHOTO + "7711e2f4-268e-4f3e-ab25-30d72a357cbe.webp" },
   // Larnach Castle, Moturoa / Rabbit Island, Stirling Point (Bluff): featured places in each town
-  { id: "dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", fact: "The world’s only mainland royal albatross colony is at Taiaroa Head, inside the city limits.", img: PHOTO + "93b9fe65-f916-449e-90f3-9574ff1aef75.webp" },
-  { id: "nelson", name: "Nelson", sub: "Golden beaches and Abel Tasman on the sunny top of the island.", fact: "It’s one of the sunniest towns in New Zealand.", img: PHOTO + "2afe072b-3dc4-478e-868d-9a76d3a17775.webp" },
-  { id: "invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "New Zealand’s southernmost city, and Burt Munro’s home town.", img: PHOTO + "c370321b-5445-4bc3-b38f-33b1164c909f.webp" },
+  // more: behind the start screen's "Other towns" button (the owner, 2026-11-23)
+  { id: "dunedin", out: "Fly out of Dunedin", name: "Dunedin", sub: "Wildlife, castles and steep streets, then south to the Catlins or inland to Central Otago.", fact: "A southern city with real character and a wild peninsula where albatross, penguins and seals live just out of town.", img: PHOTO + "6bdb19f2-c7e1-4601-bfd2-0c4265831f74.webp", more: true },
+  { id: "nelson", out: "Fly out of Nelson", name: "Nelson", sub: "Golden beaches and Abel Tasman on the sunny top of the island.", fact: "The sunniest spot in the country with golden beaches and Abel Tasman a short drive away.", img: PHOTO + "8d44a03a-d3ba-4c71-ba59-a25faf23e4b5.webp", more: true },
+  { id: "invercargill", out: "Fly out of Invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "Friendly and unhurried and your way in to Bluff, the Catlins and the ferry across to Stewart Island.", img: PHOTO + "a2f24963-ec1c-4a10-a50c-31733b302595.webp", more: true },
 ];
 
-var STEPS = ["start", "days", "break1", "season", "month", "pace", "drive", "vibe", "break2", "into", "food", "activities", "choice", "reveal", "account", "done"];
+var STEPS = ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "vibe", "break2", "into", "food", "choice", "reveal", "account", "done"];
+
+// "How long have you got?", the first quiz's rough lengths: each opens the days picker on its top number (2 to 21 days).
+var BANDS = [
+  { id: "weekend", label: "A long weekend", hint: "Three or four days", days: 4 },
+  { id: "week", label: "About a week", hint: "Five to seven days", days: 7 },
+  { id: "ten", label: "Ten days or so", hint: "A good chunk of the island", days: 10 },
+  { id: "fortnight", label: "A couple of weeks", hint: "Time to slow down", days: 14 },
+  { id: "long", label: "Three weeks", hint: "The whole island", days: 21 },
+];
+function bandOf(id) { return BANDS.filter(function (b) { return b.id === id; })[0]; }
+
+// The fewest days from each start (row) to each finish (column) from which every length up to 21 gets a trip. The builder's
+// day blocks set these (test/quiz.test.js checks them against builder.js). Back to Invercargill needs 7: its own 8 places
+// fill only two days in town, and no shorter run of blocks comes back.
+var MIN_DAYS = {
+  queenstown: { queenstown: 2, christchurch: 4, picton: 6, dunedin: 3, nelson: 7, invercargill: 2 },
+  christchurch: { queenstown: 4, christchurch: 2, picton: 2, dunedin: 7, nelson: 3, invercargill: 6 },
+  picton: { queenstown: 6, christchurch: 2, picton: 2, dunedin: 9, nelson: 2, invercargill: 8 },
+  dunedin: { queenstown: 3, christchurch: 2, picton: 3, dunedin: 2, nelson: 4, invercargill: 5 },
+  nelson: { queenstown: 8, christchurch: 4, picton: 3, dunedin: 11, nelson: 2, invercargill: 10 },
+  invercargill: { queenstown: 5, christchurch: 3, picton: 5, dunedin: 2, nelson: 6, invercargill: 7 },
+};
+function minDays(start, end) { return (MIN_DAYS[start] && MIN_DAYS[start][end]) || 2; }
+// The days are asked before the finish (owner, 2026-11-23). The fewest days any trip from this start takes:
+function leastFrom(start) { var row = MIN_DAYS[start]; return row ? Math.min.apply(null, Object.keys(row).map(function (k) { return row[k]; })) : 2; }
+// and the finishes a trip of this many days can reach from it, in the towns' order (never none: test/quiz.test.js).
+function endsFor(start, days) { return TOWNS.filter(function (t) { return minDays(start, t.id) <= days; }).map(function (t) { return t.id; }); }
+// The finish screen for a start and a number of days: the loop card (when the days get back), the towns shown as cards,
+// and the towns behind "Somewhere else?" (only when there are two or more of them and the screen would run past four cards;
+// none once it is open). Towns the days can't reach are left off (owner, 2026-11-23).
+function finishCards(start, days, open) {
+  var ok = endsFor(start, days), can = function (id) { return ok.indexOf(id) >= 0; };
+  var rest = TOWNS.filter(function (t) { return t.id !== start && can(t.id); }), more = rest.filter(function (t) { return t.more; });
+  var all = open || more.length < 2 || (can(start) ? 1 : 0) + rest.length <= 4;
+  return {
+    home: can(start),
+    towns: rest.filter(function (t) { return all || !t.more; }).map(function (t) { return t.id; }),
+    behind: all ? [] : more.map(function (t) { return t.id; }),
+  };
+}
 
 var PACES = [
   { id: "easy", label: "Easy", hint: "Short walks, mostly flat. Skips the longest walk on a busy day." },
   { id: "some", label: "Some walking", hint: "A mix: a few good walks, nothing all day." },
-  { id: "hikes", label: "Big hikes", hint: "Adds the long walks of two hours or more in each town." },
+  { id: "hikes", label: "Lots of walking", hint: "Adds the long walks of two hours or more in each town." },
 ];
 var DRIVES = [
   { id: 120, label: "A little", hint: "Up to 2 hours a day" },
@@ -41,15 +82,31 @@ var INTO = [
   { id: "Attractions", label: "Attractions", hint: "Gondolas, castles and the famous things" },
   { id: "Adventure", label: "Adventure", hint: "Jet boats, bungy and big days out" },
 ];
+// The activities a card can add to the trip, each line naming places or towns the data tags. No surfing or mountain biking
+// until the owner has tracked them (2026-11-23); skiing needs a card of its own once a ski field is tagged (none yet).
 var ACTIVITIES = [
-  { id: "surfing", label: "Surfing", hint: "Surf beaches on the route" },
   { id: "skiing", label: "Skiing", hint: "Only offered June to October" },
-  { id: "hot-pools", label: "Hot pools", hint: "Tekapo Springs and more" },
-  { id: "mountain-biking", label: "Mountain biking", hint: "Trails and bike parks" },
-  { id: "kayaking", label: "Kayaking", hint: "Lakes and bays" },
-  { id: "wildlife", label: "Wildlife", hint: "Penguins, seals, albatross and kiwi" },
-  { id: "stargazing", label: "Stargazing", hint: "Dark-sky towns" },
-  { id: "wine", label: "Wine", hint: "Cellar doors and tastings" },
+  { id: "hot-pools", label: "Hot pools", hint: "Hanmer Springs, Tekapo Springs and more" },
+  { id: "kayaking", label: "Kayaking", hint: "Abel Tasman, Wānaka, Franz Josef and more" },
+  { id: "wildlife", label: "Wildlife", hint: "Kaikōura, Ōamaru, Dunedin and more" },
+  { id: "stargazing", label: "Stargazing", hint: "Mt John and the Dark Sky Project, Tekapo" },
+  { id: "wine", label: "Wine", hint: "Wine tours around Blenheim" },
+];
+// "What are you into?": a swipe card per kind of place (into) and per activity (act), mixed (owner, 2026-11-23). Each shows one
+// real place (site) in its full-size app photo, credited as the app repo's docs/photo-sources.md records. Nature's whale says
+// yes to wildlife too, so wildlife has no card of its own.
+var DECK = [
+  { into: "Scenic", site: "devils-staircase-lookout", img: PHOTO + "b2e5ef81-cc95-4268-a0e1-49263665fa12.webp", alt: "Lake Wakatipu below a long range of snow-capped mountains, with scrub in the foreground", credit: "public domain, via Wikimedia Commons" },
+  { into: "Walks", site: "routeburn-track-day-walk", img: PHOTO + "75144c4e-3c1c-47c3-b1c9-fbe3e9041c51.webp", alt: "A wooden swing bridge on a walking track, leading into misty beech forest", credit: "ShakyIsles, CC BY-SA 4.0, resized" },
+  { into: "Nature", act: "wildlife", site: "whale-watch-kaikoura", img: PHOTO + "d07fe98e-0016-4bdd-addc-5f078dc4c73e.webp", alt: "A whale’s tail rising out of the sea, with mountains behind", credit: "Whale Watch Kaikoura" },
+  { into: "Water", site: "cruise-milford-small-boat-cruise", img: PHOTO + "67aba220-6978-4ea7-9ea9-5c747da82491.webp", alt: "A small cruise boat on Milford Sound below a sheer, bush-covered mountain wall, with a waterfall to the left", credit: "Great South" },
+  { act: "hot-pools", site: "onsen-hot-pools", img: PHOTO + "af2e0c60-d2be-4628-a5c8-72f8c7a89dd2.webp", alt: "A woman soaking in a cedar hot tub, looking out at mountains in evening light", credit: "Onsen Hot Pools" },
+  { into: "Culture", site: "toitu-otago-settlers-museum", img: PHOTO + "c2dc5a91-bd45-4279-92eb-140446f5876e.webp", alt: "Two girls walking past a red wall covered in old framed portraits of settlers", credit: "DunedinNZ" },
+  { act: "kayaking", site: "marahau-sea-kayaks", img: PHOTO + "bb7b4ee2-3468-46ed-a501-97df6aee549e.webp", alt: "Two people paddling an orange sea kayak past granite boulders in clear green water", credit: "Nelson Tasman" },
+  { into: "Attractions", site: "west-coast-treetop-walk", img: PHOTO + "7e5886dd-76f1-4bf9-9c26-883d1b354eb2.webp", alt: "Two people walking along a steel walkway high above the rainforest canopy", credit: "BareKiwi" },
+  { act: "stargazing", site: "dark-sky-project-summit-experience", img: PHOTO + "442f673d-dc53-45e3-bc73-30136399e184.webp", alt: "The Milky Way over Lake Tekapo, with the town’s lights below", credit: "Ekant Veer" },
+  { into: "Adventure", site: "franz-josef-glacier-heli-hike", img: PHOTO + "ff1293cd-b943-48ed-b68f-d7324dcfe48d.webp", alt: "Five hikers in helmets with ice axes standing on Franz Josef Glacier among towering blue-white ice", credit: "Franz Josef Glacier Guides" },
+  { act: "wine", site: "wine-tours-by-bike", img: PHOTO + "4be2fd1c-491d-45fa-8c71-344cd6c7d1cb.webp", alt: "Two cyclists riding a lane between rows of golden autumn vines", credit: "Only Marlborough" },
 ];
 // The second photo break: the first picked vibe in this order, else the last. The site's own photos (docs/photo-sources.md).
 var VIBE_PHOTOS = [
@@ -88,7 +145,10 @@ function iso(y, m, d) {
 function startDateFor(answer, today) {
   var m = answer.month;
   if (!m && answer.season) m = monthsOf(answer.season, today)[0];
-  if (!m) return iso(today.getFullYear(), today.getMonth() + 2, 1);
+  if (!m) { // no season: three months from today (the owner, 2026-11-23), the same day or, in a shorter month, its last
+    var y = today.getFullYear(), mo = today.getMonth() + 3;
+    return iso(y, mo, Math.min(today.getDate(), new Date(y, mo + 1, 0).getDate()));
+  }
   if (m.year === today.getFullYear() && m.month === today.getMonth()) return iso(today.getFullYear(), today.getMonth(), today.getDate() + 1);
   return iso(m.year, m.month, 1);
 }
@@ -118,12 +178,12 @@ function tripPhotos(list) {
 // Every middle dot in a screen becomes the centred one (the font's own sits off to the left).
 function dots(html) { return html.split("·").join(SEP.trim()); }
 
-function blankState() { return { start: null, days: null, season: null, month: null, pace: null, drive: null, vibes: null, into: null, food: null, activities: null, pick: null }; }
+function blankState() { return { start: null, end: null, band: null, days: null, season: null, month: null, pace: null, drive: null, vibes: null, into: null, food: null, activities: null, pick: null }; }
 function oneOf(list, v) { return list.some(function (x) { return x.id === v; }); }
 function someOf(list, v) { return Array.isArray(v) && v.every(function (x) { return oneOf(list, x); }); }
 
 // The answers in the order they're asked, each with the step that asks it. (The month is optional: "Not sure which month".)
-var ASKED = [["start", "start"], ["days", "days"], ["season", "season"], ["pace", "pace"], ["drive", "drive"], ["vibes", "vibe"], ["into", "into"], ["food", "food"], ["activities", "activities"], ["pick", "choice"]];
+var ASKED = [["start", "start"], ["band", "band"], ["days", "days"], ["end", "finish"], ["season", "season"], ["pace", "pace"], ["drive", "drive"], ["vibes", "vibe"], ["into", "into"], ["activities", "into"], ["food", "food"], ["pick", "choice"]];
 // The earliest step whose answer is missing, so a reload or a typed hash can't land past it.
 function firstOpenStep(st, step) {
   for (var i = 0; i < ASKED.length; i++) {
@@ -141,8 +201,14 @@ function cleanState(saved, today) {
   if (!s || typeof s !== "object") return out;
   if (!oneOf(TOWNS, s.start)) return out;
   out.start = s.start;
-  if (typeof s.days !== "number" || !(s.days >= 3 && s.days <= 21 && s.days % 1 === 0)) return out;
+  var least = leastFrom(s.start);
+  if (!oneOf(BANDS, s.band) || bandOf(s.band).days < least) return out;
+  out.band = s.band;
+  if (typeof s.days !== "number" || !(s.days >= least && s.days <= 21 && s.days % 1 === 0)) return out;
   out.days = s.days;
+  // a finish the days can't reach is asked again
+  if (!oneOf(TOWNS, s.end) || minDays(s.start, s.end) > s.days) return out;
+  out.end = s.end;
   if (s.season !== "unsure" && !oneOf(SEASONS, s.season)) return out;
   out.season = s.season;
   var m = s.month;
@@ -156,10 +222,10 @@ function cleanState(saved, today) {
   out.vibes = s.vibes.slice();
   if (!someOf(INTO, s.into)) return out;
   out.into = s.into.slice();
-  if (typeof s.food !== "boolean") return out;
-  out.food = s.food;
   if (!someOf(ACTIVITIES, s.activities)) return out;
   out.activities = s.activities.slice();
+  if (typeof s.food !== "boolean") return out;
+  out.food = s.food;
   if (typeof s.pick === "string") out.pick = s.pick; // checked against the trips once they're built
   return out;
 }
@@ -171,9 +237,19 @@ function activitiesFor(data, startMonth) {
   return ACTIVITIES.filter(function (a) { return have[a.id] && (a.id !== "skiing" || (startMonth >= 5 && startMonth <= 9)); });
 }
 
+// The cards on offer: every kind of place, and the activities the data has for this start month. A card whose activity
+// isn't on offer keeps only its kind of place (Nature without wildlife); a card that is only an activity goes.
+function cardsFor(data, startMonth) {
+  var acts = activitiesFor(data, startMonth).map(function (a) { return a.id; });
+  return DECK.filter(function (c) { return c.into || acts.indexOf(c.act) >= 0; }).map(function (c) {
+    var of = c.into ? INTO.filter(function (x) { return x.id === c.into; })[0] : ACTIVITIES.filter(function (x) { return x.id === c.act; })[0];
+    return Object.assign({}, c, { id: c.into || c.act, label: of.label, hint: of.hint, act: acts.indexOf(c.act) >= 0 ? c.act : undefined });
+  });
+}
+
 // The quiz answers in buildTrips' shape (builder.js).
 function answersFor(st) {
-  return { start: st.start, days: st.days, pace: st.pace, drive: st.drive, vibes: st.vibes, into: st.into, food: st.food, activities: st.activities };
+  return { start: st.start, end: st.end, days: st.days, pace: st.pace, drive: st.drive, vibes: st.vibes, into: st.into, food: st.food, activities: st.activities };
 }
 
 // What the trip screens show: "loading" until the builder's data and pack.js are in, "error" if they failed, else the trips.
@@ -183,16 +259,53 @@ function revealState(load, ans, build) {
   return build(load.data, load.pack, ans);
 }
 
-// The photo breaks: 1 after "How many days?" (the start town's card photo), 2 after the vibe.
+// The photo breaks: 1 after "Where does your trip finish?" (the start town's card photo), 2 after the vibe.
 function breakLine(n, st) {
   if (n === 1) {
     var t = TOWNS.filter(function (x) { return x.id === st.start; })[0];
     // the photo is a thumbnail, so it shows as a card at its own size, not full screen
-    return { line: t.name + ", " + st.days + " days. Good pick. " + t.fact, img: t.img, credit: "", card: true };
+    var head = t.name + ", " + st.days + " days.";
+    return { line: head + " " + t.fact, head: t.name + ", " + st.days + "\u00a0days.", body: t.fact, img: t.img, credit: "", card: true };
   }
   var vibes = st.vibes || [];
   var p = VIBE_PHOTOS.filter(function (x) { return vibes.indexOf(x.vibe) >= 0; })[0] || VIBE_PHOTOS[VIBE_PHOTOS.length - 1];
   return { line: "Over 500 places on the island. Picking the ones that fit you.", img: p.img, credit: p.credit };
+}
+
+// Back never lands on a photo break: from the screen after one it goes to the question before it.
+function backStep(step) {
+  var p = Math.max(0, step - 1);
+  return /^break/.test(STEPS[p]) ? p - 1 : p;
+}
+
+// The cards: a new deck opens on card 1; coming back to a finished one shows its last card again, that card's yes taken back.
+function deckStart(ids, picked) {
+  if (!picked) return { idx: 0, yes: [] };
+  var last = ids[ids.length - 1];
+  return { idx: Math.max(0, ids.length - 1), yes: picked.filter(function (id) { return id !== last && ids.indexOf(id) >= 0; }) };
+}
+// What the yes cards answer: their kinds of place and their activities, each in its own list's order.
+function deckAnswers(cards, yes) {
+  var on = cards.filter(function (c) { return yes.indexOf(c.id) >= 0; });
+  var pick = function (list, key) { return list.map(function (x) { return x.id; }).filter(function (id) { return on.some(function (c) { return c[key] === id; }); }); };
+  return { into: pick(INTO, "into"), activities: pick(ACTIVITIES, "act") };
+}
+// The yes cards behind answers already given (back to a finished deck), or null before the deck is done.
+function deckYes(cards, st) {
+  if (!st.into || !st.activities) return null;
+  return cards.filter(function (c) { return c.into ? st.into.indexOf(c.into) >= 0 : st.activities.indexOf(c.act) >= 0; }).map(function (c) { return c.id; });
+}
+// One card answered: the deck on its next card, or, after the last, the answers in the state (and no trip picked: the trips change).
+function deckAnswer(deck, cards, yes, st) {
+  var next = { idx: deck.idx + 1, yes: yes ? deck.yes.concat([cards[deck.idx].id]) : deck.yes.slice(), key: deck.key };
+  if (next.idx < cards.length) return { deck: next, st: st };
+  var got = deckAnswers(cards, next.yes);
+  return { deck: null, st: Object.assign({}, st, { into: got.into, activities: got.activities, pick: null }) };
+}
+// A key on the cards: the right arrow says yes, the left arrow no; a key held down (its repeats) or with a modifier, nothing.
+function deckKey(e) {
+  if (e.repeat || e.altKey || e.ctrlKey || e.metaKey) return null;
+  return e.key === "ArrowRight" ? true : e.key === "ArrowLeft" ? false : null;
 }
 
 function labelOf(list, id) { return list.filter(function (x) { return x.id === id; })[0].label; }
@@ -200,11 +313,11 @@ function and(list, word) { return list.length < 2 ? list.join("") : list.slice(0
 
 // The reveal's summary: the visitor's own answers, nothing more.
 function summaryLine(option, st) {
-  var parts = [labelOf(PACES, st.pace), "up to " + st.drive / 60 + " h driving"];
-  if (st.vibes.length) parts.push(and(st.vibes.map(function (v) { return labelOf(VIBES, v); })));
-  parts.push(st.food ? "food tips on" : "no food tips");
+  var parts = [labelOf(PACES, st.pace).toLowerCase(), "up to " + st.drive / 60 + " hours of driving a day"];
+  if (st.vibes.length) parts.push(and(st.vibes.map(function (v) { return labelOf(VIBES, v).toLowerCase(); })));
+  parts.push(st.food ? "food tips" : "no food tips");
   st.activities.forEach(function (a) { parts.push(labelOf(ACTIVITIES, a).toLowerCase()); });
-  return (option.kind === "built" ? "Built for you: " : "Hand-checked trip: ") + parts.join(" · ") + ".";
+  return (option.kind === "built" ? "Built for you: " : "Hand-checked trip: ") + parts.join(", ") + ".";
 }
 
 // "Try again" after a failed load: back to idle, so the next render loads again. Anything else stays as it is.
@@ -232,7 +345,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { STEPS: STEPS, TOWNS: TOWNS, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine, summaryLine: summaryLine, retryLoad: retryLoad, waitScreen: waitScreen };
+  module.exports = { STEPS: STEPS, TOWNS: TOWNS, BANDS: BANDS, MIN_DAYS: MIN_DAYS, minDays: minDays, leastFrom: leastFrom, endsFor: endsFor, finishCards: finishCards, PACES: PACES, backStep: backStep, deckStart: deckStart, cardsFor: cardsFor, deckAnswers: deckAnswers, deckYes: deckYes, deckAnswer: deckAnswer, deckKey: deckKey, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine, summaryLine: summaryLine, retryLoad: retryLoad, waitScreen: waitScreen };
 }
 
 // ---- the page ----
@@ -242,11 +355,15 @@ if (typeof document !== "undefined") (function () {
   var root = document.getElementById("q");
   var bar = document.getElementById("bar");
   var backBtn = document.getElementById("back");
-  var PROGRESS = { start: 8, days: 16, break1: 24, season: 30, month: 38, pace: 46, drive: 54, vibe: 62, break2: 66, into: 70, food: 78, activities: 86, choice: 92, reveal: 100, account: 100, done: 100 };
+  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 38, pace: 46, drive: 54, vibe: 62, break2: 66, into: 74, food: 88, choice: 94, reveal: 100, account: 100, done: 100 };
   var S = {}; STEPS.forEach(function (n, i) { S[n] = i; });
-  var NEEDS_DATA = { activities: 1, choice: 1, reveal: 1, account: 1 };
+  var NEEDS_DATA = { into: 1, choice: 1, reveal: 1, account: 1 };
   var CHIPS = [3, 5, 7, 10, 12, 14, 17, 21];
   var draft = null; // the days picker's number, or a pick list's ids, until Next
+  var allTowns = false, allEnds = false; // "Somewhere else?" tapped: the start (or finish) screen shows every town
+  // The activity cards: where the visitor is in the deck (in memory: a reload starts the deck again), one card moving at a time
+  var deck = null, busy = false, keyHandler = null;
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var st = blankState();
   try { st = cleanState(JSON.parse(sessionStorage.getItem(KEY)), new Date()); } catch (e) { /* works without it */ }
@@ -306,6 +423,9 @@ if (typeof document !== "undefined") (function () {
   function days(n) { return n + (n === 1 ? " day" : " days"); }
   function startMonth() { return +startDateFor(st, new Date()).slice(5, 7) - 1; }
   function offered() { return activitiesFor(load.data, startMonth()); }
+  function cards() { return cardsFor(load.data, startMonth()); }
+  function least() { return leastFrom(st.start); }
+  function fromTo() { return st.end === st.start ? "From " + town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name; }
 
   // The trips for the answers, built once per set of answers, each stop with its place's photo and categories.
   var cache = { k: "", list: null };
@@ -366,9 +486,8 @@ if (typeof document !== "undefined") (function () {
   function prevStep(step) {
     var name = STEPS[step];
     if (name === "reveal") { var o = options(); return typeof o !== "string" && o.length === 1 ? prevStep(S.choice) : S.choice; }
-    if (name === "choice") return load.status === "ready" && !offered().length ? S.food : S.activities;
     if (name === "pace") return st.season && st.season !== "unsure" ? S.month : S.season;
-    return Math.max(0, step - 1);
+    return backStep(step);
   }
 
   function choice(label, hint, act, val, on) {
@@ -378,11 +497,11 @@ if (typeof document !== "undefined") (function () {
     return list.map(function (x) {
       var on = draft.indexOf(x.id) >= 0;
       return '<button type="button" class="q-btn q-pick' + (on ? " q-on" : "") + '" data-act="toggle" data-val="' + esc(x.id) + '" aria-pressed="' + on + '"><span>' + esc(x.label) + "<small>" + esc(x.hint) + '</small></span><span class="q-chk" aria-hidden="true">' + (on ? "✓" : "") + "</span></button>";
-    }).join("") + '<button type="button" class="q-cta q-next" data-act="picked" data-val="' + key + '">Next</button>';
+    }).join("") + '<button type="button" class="q-cta q-next" data-act="picked" data-val="' + key + '">' + (draft.length ? "Next" : "Skip") + "</button>";
   }
   function photoBreak(b) {
-    return '<div class="q-brk' + (b.card ? " q-brk-card" : "") + '"><img src="' + esc(b.img) + '" alt=""><div class="q-brk-text"><h1 class="q-brk-line" tabindex="-1">' + esc(b.line) + "</h1>" +
-      (b.credit ? "<small>" + esc(b.credit) + "</small>" : "") + '<button type="button" class="q-kiwi" data-act="next">Next</button></div></div>';
+    return '<div class="q-brk' + (b.card ? " q-brk-card" : "") + '"><img src="' + esc(b.img) + '" alt=""><div class="q-brk-text"><h1 class="q-brk-line" tabindex="-1">' + esc(b.head || b.line) + "</h1>" + (b.body ? '<p class="q-brk-body">' + esc(b.body) + "</p>" : "") +
+      (b.credit ? "<small>" + esc(b.credit) + "</small>" : "") + '<button type="button" class="q-cta q-next" data-act="next">Next</button></div></div>';
   }
   function whenLabel() {
     return st.month ? MONTH_NAMES[st.month.month] + " " + st.month.year : st.season && st.season !== "unsure" ? labelOf(SEASONS, st.season) : "";
@@ -390,27 +509,53 @@ if (typeof document !== "undefined") (function () {
 
   var screens = {
     start: function () {
+      // Queenstown, Christchurch and Picton, then "Somewhere else?" with Dunedin's photo for the rest (owner, 2026-11-23),
+      // open already when the visitor picked one of them
+      var all = allTowns || town(st.start) && town(st.start).more, more = TOWNS.filter(function (t) { return t.more; });
       return '<p class="q-kicker">Plan your South Island trip in a minute</p><h1 tabindex="-1">Where do you start?</h1>' +
-        TOWNS.map(function (t) {
+        TOWNS.filter(function (t) { return all || !t.more; }).map(function (t) {
           return '<button type="button" class="q-town" data-act="start" data-val="' + t.id + '"><img src="' + t.img + '" alt="" width="640" height="360">' +
             '<span class="q-town-text"><strong>' + t.name + "</strong><span>" + esc(t.sub) + "</span></span></button>";
-        }).join("");
+        }).join("") +
+        (all ? "" : '<button type="button" class="q-town" data-act="other-towns"><img src="' + more[0].img + '" alt="" width="640" height="360">' +
+          '<span class="q-town-text"><strong>Somewhere else?</strong><span>' + esc(and(more.map(function (t) { return t.name; }), "or")) + "</span></span></button>");
+    },
+    // Asked once the days are set (owner, 2026-11-23), so only the towns those days can reach. The start town first,
+    // highlighted: "Finish back in X"; then the other towns as the start screen has them.
+    finish: function () {
+      // open already when the visitor picked one of the towns behind "Somewhere else?"
+      var home = town(st.start), f = finishCards(st.start, st.days, allEnds || !!(st.end && st.end !== st.start && town(st.end).more));
+      var card = function (t, title, line, cls) {
+        return '<button type="button" class="q-town' + (cls || "") + '" data-act="finish" data-val="' + t.id + '"><img src="' + t.img + '" alt="" width="640" height="360">' +
+          '<span class="q-town-text"><strong>' + esc(title) + "</strong><span>" + esc(line) + "</span></span></button>";
+      };
+      return '<p class="q-kicker">' + days(st.days) + " from " + home.name + '</p><h1 tabindex="-1">Where does your trip finish?</h1>' +
+        (f.home ? card(home, "Finish back in " + home.name, "A loop, back where you started", " q-home") : "") +
+        f.towns.map(function (id) { var t = town(id); return card(t, t.name, t.out); }).join("") +
+        (!f.behind.length ? "" : '<button type="button" class="q-town" data-act="other-ends"><img src="' + town(f.behind[0]).img + '" alt="" width="640" height="360">' +
+          '<span class="q-town-text"><strong>Somewhere else?</strong><span>' + esc(and(f.behind.map(function (id) { return town(id).name; }), "or")) + "</span></span></button>");
+    },
+    // Every length this start can do
+    band: function () {
+      return '<p class="q-kicker">From ' + town(st.start).name + '</p><h1 tabindex="-1">How long have you got?</h1>' +
+        BANDS.filter(function (b) { return b.days >= least(); }).map(function (b) { return choice(b.label, b.hint, "band", b.id, st.band === b.id); }).join("");
     },
     days: function () {
-      return '<p class="q-kicker">From ' + town(st.start).name + '</p><h1 tabindex="-1">How many days?</h1><p class="q-lead">Pick anything from 3 to 21.</p>' +
+      var n = least();
+      return '<p class="q-kicker">' + esc(bandOf(st.band).label) + '</p><h1 tabindex="-1">How many days?</h1><p class="q-lead">' + "Pick anything from " + n + " to 21.</p>" +
         '<div class="q-stepper"><button type="button" class="q-step" data-act="fewer" aria-label="One day fewer">−</button>' +
         '<p class="q-num"><strong id="q-n" aria-live="polite">' + draft + "</strong><span>days</span></p>" +
         '<button type="button" class="q-step" data-act="more" aria-label="One day more">+</button></div>' +
-        '<input type="range" class="q-range" id="q-range" min="3" max="21" step="1" value="' + draft + '" aria-label="Number of days">' +
-        '<div class="q-ends" aria-hidden="true"><span>3</span><span>21</span></div>' +
-        '<div class="q-chips">' + CHIPS.map(function (c) {
+        '<input type="range" class="q-range" id="q-range" min="' + n + '" max="21" step="1" value="' + draft + '" aria-label="Number of days">' +
+        '<div class="q-ends" aria-hidden="true"><span>' + n + "</span><span>21</span></div>" +
+        '<div class="q-chips">' + CHIPS.filter(function (c) { return c >= n; }).map(function (c) {
           return '<button type="button" class="q-chip' + (c === draft ? " q-on" : "") + '" data-act="setdays" data-val="' + c + '" aria-pressed="' + (c === draft) + '">' + c + "</button>";
         }).join("") + "</div>" +
         '<button type="button" class="q-cta q-next" data-act="days">Next</button>';
     },
     break1: function () { return photoBreak(breakLine(1, st)); },
     season: function () {
-      return '<p class="q-kicker">' + days(st.days) + " from " + town(st.start).name + '</p><h1 tabindex="-1">Which NZ season are you picking?</h1><p class="q-lead">Southern hemisphere seasons!</p>' +
+      return '<p class="q-kicker">' + esc(fromTo()) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which NZ season are you picking?</h1><p class="q-lead">Southern hemisphere seasons!</p>' +
         SEASONS.map(function (s) { return choice(s.label, s.hint + ". " + s.feel, "season", s.id, st.season === s.id); }).join("") +
         choice("Not sure yet", "Set your dates later in the app.", "season", "unsure", st.season === "unsure");
     },
@@ -430,19 +575,28 @@ if (typeof document !== "undefined") (function () {
       return '<p class="q-kicker">' + esc(labelOf(PACES, st.pace)) + '</p><h1 tabindex="-1">How much driving?</h1>' +
         DRIVES.map(function (d) { return choice(d.label, d.hint, "drive", d.id, st.drive === d.id); }).join("");
     },
-    vibe: function () { return '<p class="q-kicker">Pick any, or skip</p><h1 tabindex="-1">What’s the vibe?</h1>' + picks("vibes", VIBES); },
+    vibe: function () { return '<h1 tabindex="-1">What’s the vibe?</h1><p class="q-lead">Pick as many as you like.</p>' + picks("vibes", VIBES); },
     break2: function () { return photoBreak(breakLine(2, st)); },
-    into: function () { return '<p class="q-kicker">Pick any, or skip</p><h1 tabindex="-1">What are you into?</h1>' + picks("into", INTO); },
+    // The swipe deck, a card per kind of place and per activity on offer: right (or the heart, or the right arrow key) for yes
+    into: function () {
+      var list = cards(), c = list[deck.idx], next = list[deck.idx + 1], what = esc(c.label.toLowerCase());
+      return '<div class="q-deck-head"><h1 tabindex="-1">What are you into?</h1>' +
+        '<p class="q-kicker"><b id="q-card-n">' + (deck.idx + 1) + " of " + list.length + '</b> · <span class="q-touch">Swipe right for yes, left for no.</span><span class="q-keys">Drag the card, or press → for yes and ← for no.</span></p></div>' +
+        '<div class="q-deck">' +
+        (next ? '<div class="q-card q-card-next"><img src="' + esc(next.img) + '" alt="" width="640" height="480"></div>' : "") +
+        '<div class="q-card q-card-top" id="card"><div class="q-card-body">' +
+        '<div class="q-card-photo"><img src="' + esc(c.img) + '" alt="' + esc(c.alt) + '" width="640" height="480"><div class="q-card-text"><h2>' + esc(c.label) + '</h2><p id="q-card-line">' + esc(c.hint) + '</p><small class="q-credit">' + esc(load.data.places[c.site].name) + ". Photo: " + esc(c.credit) + "</small></div></div></div>" +
+        '<span class="q-stamp q-yes" id="stamp-yes" aria-hidden="true">YES</span><span class="q-stamp q-no" id="stamp-no" aria-hidden="true">NOPE</span></div></div>' +
+        '<div class="q-deck-btns"><button type="button" class="q-round q-round-no" data-act="no" aria-label="No, skip ' + what + '" aria-describedby="q-card-n q-card-line"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>No</button>' +
+        '<button type="button" class="q-round q-round-yes" data-act="yes" aria-label="Yes, add ' + what + '" aria-describedby="q-card-n q-card-line"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.5 1.2 4.3 2.4h2c.8-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>Yes</button></div>';
+    },
     food: function () {
       return '<p class="q-kicker">Nearly there</p><h1 tabindex="-1">Food tips?</h1><p class="q-lead">Cafés and places to eat, placed along each day.</p>' +
         choice("Yes", "Add the good places to eat", "food", "yes", st.food === true) + choice("No", "Just the places to see", "food", "no", st.food === false);
     },
-    activities: function () {
-      return '<p class="q-kicker">Pick any, or skip</p><h1 tabindex="-1">Anything to do?</h1><p class="q-lead">We’ll put it on a day in a town that has it.</p>' + picks("activities", offered());
-    },
     choice: function () {
       var list = options(), photos = tripPhotos(list);
-      return '<p class="q-kicker">' + list.length + " trips fit " + town(st.start).name + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
+      return '<p class="q-kicker">' + list.length + " trips fit " + (st.end === st.start ? town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
         list.map(function (t, n) {
           var built = t.kind === "built";
           return '<button type="button" class="q-trip" data-act="pick" data-val="' + esc(t.key) + '">' + (photos[n] ? '<img src="' + esc(photos[n]) + '" alt="" width="640" height="240">' : "") +
@@ -460,12 +614,13 @@ if (typeof document !== "undefined") (function () {
       }).join("");
       if (tv.pick !== st.pick) tv = { pick: st.pick, view: "trip", day: tv.day }; // another trip opens on Trip; the open day stays if it has one (paintTrip clamps it)
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
-        '<p class="q-when">From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + " · " + days(t.days.length) + " · " + (w ? w + " · dates" : "Dates") + " to set in the app</p>" +
+        '<p class="q-when"><b>From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + '</b><br><span class="q-nb">' + days(t.days.length) + (w ? " · " + w : "") + ".</span> Change the dates in the app.</p>" +
+        // Save at the top, before the trip (the owner, 2026-11-23)
+        '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
         (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
         '<div id="tv" class="q-days tv"></div>' + notes +
-        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
-        '<div class="q-actions q-bottom"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-again" data-act="again">Start again</button></div>';
+        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "");
     },
     account: function () {
       var t = thisTrip();
@@ -506,9 +661,11 @@ if (typeof document !== "undefined") (function () {
         '<button type="button" class="q-again" data-act="again">Start again</button></div>';
     },
   };
-  var PICK_KEY = { vibe: "vibes", into: "into", activities: "activities" };
+  var PICK_KEY = { vibe: "vibes" };
 
   function render() {
+    removeKeys();
+    stopHint();
     var step = stepFromHash(location.hash), name = STEPS[step];
     var ok = firstOpenStep(st, step);
     if (name === "account" && savedInfo()) { location.replace("#" + S.done); return; }
@@ -519,24 +676,111 @@ if (typeof document !== "undefined") (function () {
       root.innerHTML = dots(waitScreen(load.status));
       return painted(name);
     }
-    if (name === "activities" && !offered().length) { st.activities = []; save(); location.replace("#" + S.choice); return; }
     if (name === "choice") { var list = options(); if (list.length === 1) { st.pick = list[0].key; save(); location.replace("#" + S.reveal); return; } }
     if ((name === "reveal" || name === "account") && !thisTrip()) { st.pick = null; save(); location.replace("#" + S.choice); return; }
     if (name === "reveal" && st.pick !== revealed) {
       revealed = st.pick; try { sessionStorage.setItem("kg-revealed", revealed); } catch (e) { /* fires again */ }
       track("quiz_reveal", Object.assign({ trip: st.pick }, measureParams(thisTrip(), st)));
     }
-    draft = name === "days" ? st.days || 7 : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
+    if (name === "into") {
+      // the deck as the visitor left it, unless the cards on offer changed (a new month brings or drops skiing)
+      var deal = cards(), ids = deal.map(function (c) { return c.id; }), key = ids.join();
+      if (!deck || deck.key !== key) deck = Object.assign(deckStart(ids, deckYes(deal, st)), { key: key });
+    }
+    draft = name === "days" ? st.days || Math.max(bandOf(st.band).days, least()) : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
     root.innerHTML = dots(screens[STEPS[step]]());
     // tripview.js lost on the way (one dropped request): say so; the screen still finishes, and Save still builds the trip
     if (name === "reveal") try { paintTrip(); } catch (e) { document.getElementById("tv").innerHTML = '<p class="q-error">Your days would not show. Reload the page to see them.</p>'; }
     painted(name);
+    if (name === "into") {
+      setupDeck();
+      // after an answer, focus stays on the button just used (it names the new card), not back on the heading
+      if (deck.focus) { root.querySelector('[data-act="' + deck.focus + '"]').focus({ preventScroll: true }); deck.focus = null; }
+    }
+  }
+
+  // The one-time nudge on card 1 (right, then left), about 3 s. Anything the visitor does cancels it.
+  var HINT = "kg-hint", hintTimer = null, hintAnims = [];
+  function stopHint() { clearTimeout(hintTimer); hintAnims.forEach(function (a) { a.cancel(); }); hintAnims = []; }
+  function startHint(card, yes, no) {
+    var seen = false;
+    try { seen = !!sessionStorage.getItem(HINT); } catch (e) { /* shows each time */ }
+    if (seen || reduced || deck.idx !== 0 || !card.animate) return;
+    hintTimer = setTimeout(function () {
+      try { sessionStorage.setItem(HINT, "1"); } catch (e) { /* fine */ }
+      // 3 s: out to one side 600 ms, hold 400, back 500; then the other side the same.
+      var o = { duration: 3000 }, R = "translateX(40px) rotate(2.2deg)", L = "translateX(-40px) rotate(-2.2deg)";
+      hintAnims = [
+        card.animate([{ transform: "none", easing: "ease-out" }, { transform: R, offset: 0.2 }, { transform: R, offset: 0.333, easing: "ease-in-out" }, { transform: "none", offset: 0.5, easing: "ease-out" }, { transform: L, offset: 0.7 }, { transform: L, offset: 0.833, easing: "ease-in-out" }, { transform: "none" }], o),
+        yes.animate([{ opacity: 0, easing: "ease-out" }, { opacity: 0.6, offset: 0.2 }, { opacity: 0.6, offset: 0.333, easing: "ease-in-out" }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], o),
+        no.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5, easing: "ease-out" }, { opacity: 0.6, offset: 0.7 }, { opacity: 0.6, offset: 0.833, easing: "ease-in-out" }, { opacity: 0 }], o),
+      ];
+    }, 600);
+  }
+  function removeKeys() { if (keyHandler) { document.removeEventListener("keydown", keyHandler); keyHandler = null; } }
+
+  // A card answered: it flies off, then the next card, or the trips once the last one is done.
+  function decide(yes) {
+    if (busy) return;
+    busy = true;
+    var card = document.getElementById("card"), list = cards();
+    var done = function () {
+      busy = false;
+      if (STEPS[stepFromHash(location.hash)] !== "into") return; // the visitor went back mid-swipe
+      var r = deckAnswer(deck, list, yes, st);
+      st = r.st; deck = r.deck;
+      if (deck) { deck.focus = yes ? "yes" : "no"; return render(); }
+      answered("into", st.into.join(",") || "none"); answered("activities", st.activities.join(",") || "none"); save();
+      go(S.food);
+    };
+    if (reduced || !card) return done();
+    card.style.transition = "transform .25s ease";
+    card.style.transform = "translateX(" + (yes ? 600 : -600) + "px) rotate(" + (yes ? 25 : -25) + "deg)";
+    setTimeout(done, 250);
+  }
+
+  // The top card follows a finger (or mouse) sideways; past 100 px it counts, short of that it springs back.
+  function setupDeck() {
+    var card = document.getElementById("card");
+    var x0 = 0, dx = 0, drag = false;
+    var yes = document.getElementById("stamp-yes"), no = document.getElementById("stamp-no");
+    card.addEventListener("pointerdown", function (e) {
+      stopHint();
+      if (busy) return;
+      drag = true; x0 = e.clientX; dx = 0; card.style.transition = "none";
+      try { card.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+    });
+    card.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      dx = e.clientX - x0;
+      card.style.transform = "translateX(" + dx + "px) rotate(" + dx / 18 + "deg)";
+      yes.style.opacity = Math.max(0, Math.min(1, dx / 90));
+      no.style.opacity = Math.max(0, Math.min(1, -dx / 90));
+    });
+    var end = function () {
+      if (!drag) return;
+      drag = false;
+      if (dx > 100) return decide(true);
+      if (dx < -100) return decide(false);
+      card.style.transition = reduced ? "none" : "transform .25s ease";
+      card.style.transform = "";
+      yes.style.opacity = no.style.opacity = 0;
+    };
+    card.addEventListener("pointerup", end);
+    card.addEventListener("pointercancel", end);
+    keyHandler = function (e) {
+      stopHint();
+      var yes = deckKey(e);
+      if (yes !== null) decide(yes);
+    };
+    document.addEventListener("keydown", keyHandler);
+    startHint(card, yes, no);
   }
   function painted(name) {
     bar.style.width = PROGRESS[name] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[name]);
     backBtn.hidden = name === "start" || name === "done";
-    document.body.classList.toggle("q-photo", !!root.querySelector(".q-brk"));
+    document.body.classList.toggle("q-photo", !!root.querySelector(".q-brk:not(.q-brk-card)"));
     if (notice) { root.insertAdjacentHTML("afterbegin", '<p class="q-error" role="alert">' + esc(notice) + "</p>"); notice = ""; }
     root.scrollTop = 0;
     window.scrollTo(0, 0);
@@ -552,7 +796,7 @@ if (typeof document !== "undefined") (function () {
 
   // The days picker: the number, the slider and the chips move together.
   function setDays(n) {
-    draft = Math.max(3, Math.min(21, n));
+    draft = Math.max(least(), Math.min(21, n));
     document.getElementById("q-n").textContent = draft;
     document.getElementById("q-range").value = draft;
     Array.prototype.forEach.call(root.querySelectorAll(".q-chip"), function (c) {
@@ -567,15 +811,22 @@ if (typeof document !== "undefined") (function () {
 
   root.addEventListener("click", function (e) {
     if (e.target.closest("a.badge")) track("app_store_click", { trip: st.pick });
+    stopHint();
     var b = e.target.closest("[data-act]");
     if (!b || g.busy()) return;
     var act = b.getAttribute("data-act"), v = b.getAttribute("data-val"), step = stepFromHash(location.hash);
-    if (act === "start") { if (!started) { started = true; track("quiz_start"); } answered("start", v); st.start = v; st.pick = null; save(); loadData(); go(S.days); }
+    if (act === "start") { if (!started) { started = true; track("quiz_start"); } answered("start", v); if (st.start !== v) { st.end = null; allEnds = false; } st.start = v; st.pick = null; save(); loadData(); go(S.band); }
+    else if (act === "finish") { answered("finish", v); st.end = v; st.pick = null; save(); go(S.break1); }
+    else if (act === "other-ends") { var first = finishCards(st.start, st.days, false).behind[0]; allEnds = true; render(); root.querySelector('[data-act="finish"][data-val="' + first + '"]').focus(); }
+    else if (act === "other-towns") { allTowns = true; render(); root.querySelector('[data-act="start"][data-val="' + TOWNS.filter(function (t) { return t.more; })[0].id + '"]').focus(); }
+    else if (act === "band") { answered("band", v); if (st.band !== v) st.days = null; st.band = v; st.pick = null; save(); go(S.days); }
     else if (act === "fewer") setDays(draft - 1);
     else if (act === "more") setDays(draft + 1);
     else if (act === "setdays") setDays(+v);
-    else if (act === "days") { answered("days", String(draft)); st.days = draft; st.pick = null; save(); go(S.break1); }
-    else if (act === "next") go(step + 1);
+    else if (act === "days") { answered("days", String(draft)); st.days = draft; if (st.end && minDays(st.start, st.end) > draft) st.end = null; st.pick = null; save(); go(S.finish); }
+    else if (act === "next" && /^break/.test(STEPS[step])) location.replace("#" + (step + 1));
+    else if (act === "yes") decide(true);
+    else if (act === "no") decide(false);
     else if (act === "season") { answered("season", v); st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? S.pace : S.month); }
     else if (act === "month") { answered("month", v || "none"); var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(S.pace); }
     else if (act === "pace") { answered("pace", v); st.pace = v; st.pick = null; save(); go(S.drive); }
@@ -584,14 +835,15 @@ if (typeof document !== "undefined") (function () {
       var at = draft.indexOf(v), on = at < 0;
       if (on) draft.push(v); else draft.splice(at, 1);
       b.classList.toggle("q-on", on); b.setAttribute("aria-pressed", on); b.querySelector(".q-chk").textContent = on ? "✓" : "";
+      root.querySelector('[data-act="picked"]').textContent = draft.length ? "Next" : "Skip";
     }
     else if (act === "picked") {
-      var list = v === "vibes" ? VIBES : v === "into" ? INTO : ACTIVITIES;
+      var list = VIBES;
       st[v] = list.map(function (x) { return x.id; }).filter(function (id) { return draft.indexOf(id) >= 0; }); // in list order
       answered(STEPS[step], st[v].join(",") || "none"); st.pick = null; save();
-      go(v === "vibes" ? S.break2 : v === "into" ? S.food : S.choice);
+      go(S.break2);
     }
-    else if (act === "food") { answered("food", v); st.food = v === "yes"; st.pick = null; save(); go(S.activities); }
+    else if (act === "food") { answered("food", v); st.food = v === "yes"; st.pick = null; save(); go(S.choice); }
     else if (act === "tv-view" || act === "tv-tab") {
       if (act === "tv-view") tv.view = v; else tv.day = +v;
       paintTrip();
@@ -606,7 +858,7 @@ if (typeof document !== "undefined") (function () {
       else { document.getElementById("tv").scrollIntoView(); root.querySelector('.tv-tab[aria-pressed="true"]').focus({ preventScroll: true }); }
     }
     else if (act === "pick") { answered("choice", v); st.pick = v; save(); go(S.reveal); }
-    else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
+    else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; deck = null; allTowns = allEnds = false; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
     else if (act === "save") { acct.error = ""; acct.note = ""; go(S.account); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();

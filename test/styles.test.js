@@ -57,9 +57,14 @@ test("larger text or page zoom: a block grows with its words instead of cutting 
   assert.match(decl(base(), ".tv-stop, .tv-drv"), /line-height:\s*1\.3;/);
 });
 
-test("keyboard focus: rings inside the scrollers that would clip them, never behind the Save bar", () => {
+test("keyboard focus: rings inside the scrollers that would clip them", () => {
   assert.match(decl(base(), ".tv-tab:focus-visible, .tv-days:focus-visible"), /outline-offset:\s*-3px/);
-  assert.match(decl(base(), ".q-main:has(> .q-bottom)"), /scroll-padding-bottom:\s*100px/);
+});
+
+test("the activity cards fill the screen's height; nothing else in the quiz shrinks", () => {
+  assert.match(decl(base(), ".q-main > :not(.q-deck)"), /flex-shrink:\s*0/);
+  assert.match(decl(base(), ".q-deck"), /flex:\s*1;/);
+  assert.match(decl(base(), ".q-card-top"), /touch-action:\s*pan-y/, "a sideways drag moves the card; up and down still scroll");
 });
 
 test("dark mode: the open row on wide screens has the app's edge, not only its fill", () => {

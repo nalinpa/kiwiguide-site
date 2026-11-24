@@ -59,8 +59,11 @@ var START_MORNING = { christchurch: ["christchurch-botanic-gardens", "avon-river
 // A day whose own stops end in its town, but whose stops left end before it (food off, Easy or a repeat took the ones there),
 // arrives there after the drive in (owner, 2026-11-24: "back to chch riverside market, art gallery or other central chch
 // things"): the town's places within ARRIVE.km of its middle, best fit, then featured, then the nearest; at least one, so the
-// night is there, then while the day has fewer than 3 sights.
-var ARRIVE = { km: 3 };
+// night is there, then while the day has fewer than 3 sights. A day that arrives after them all (they end by 6 PM, 8 PM
+// outdoors) ends at its town's evening place until ARRIVE.until (9 PM): Riverside Markets in Christchurch (owner, 2026-11-24:
+// "assume that riverside market is an option always cos its more than just food"). A day the owner ends on the road into its
+// town (the Sounds road into Picton) arrives too when its stops left end further back (2026-11-24: "reach Picton").
+var ARRIVE = { km: 3, evening: { christchurch: "DXWpQTSPRQQKPt7SIcVi" }, until: 26 };
 // An afternoon left empty (owner, 2026-11-24: "add some wanaka places", "add more in qt", "add another stop in each"): a day
 // that ends in its town before AFTERNOON.before takes more there after its last stop, while it ends before AFTERNOON.until
 // (half-hour slots from 8 AM: 4 PM, 5 PM): the town's favourites first, even ones the trip has been to (not twice in a day;
@@ -315,7 +318,9 @@ function tryAdd(pack, look, prevLast, items, cands, from, tries, ahead, slack, f
 // The towns a rest day may go out to and back (owner, 2026-11-24: Banks Peninsula from Christchurch, Wānaka from
 // Queenstown): at most 90 minutes each way by the app's drive between the two towns' hubs, the owner's ranking first, then
 // the nearer. A town's hub is its hub place, or (Wānaka's isn't in the data) its place nearest the middle of its places.
-var DAY_OUT = { slots: 3 }; // half-hours each way, at most
+// A road out is a nearby town whatever its hub (owner, 2026-11-24: "a Milford road walk" from Te Anau); only its places within
+// the 90 minutes go.
+var DAY_OUT = { slots: 3, roads: { "te-anau": ["milford-sound"] } }; // half-hours each way, at most
 function townHub(data, pack, town) {
   if (data.places[pack.hubs[town]]) return pack.hubs[town];
   var spot = townSpot(data, pack, town);
@@ -328,7 +333,7 @@ function nearbyTowns(data, pack, town) {
   var from = townHub(data, pack, town);
   return (ctx.near[key] = Object.keys(data.towns).filter(function (t) { return t !== town; }).map(function (t) {
     var to = townHub(data, pack, t), leg = from && to ? pack.getLeg(from, to, look) : { drive: null };
-    return { town: t, slots: leg.drive ? leg.slots : 0 };
+    return { town: t, slots: (DAY_OUT.roads[town] || []).indexOf(t) >= 0 ? 1 : leg.drive ? leg.slots : 0 };
   }).filter(function (x) { return x.slots && x.slots <= DAY_OUT.slots; }).sort(function (a, b) {
     return townPref(b.town) - townPref(a.town) || a.slots - b.slots || (a.town < b.town ? -1 : 1);
   }).map(function (x) { return x.town; }));
@@ -337,7 +342,7 @@ function nearbyTowns(data, pack, town) {
 // A rest day out to a nearby town and back, the way the owner's own Glenorchy and Milford days go: the nearby town's places
 // (cands, best first) while the day has room, then one of the home town's (ends: the first that works) for the evening, so
 // the next day starts there. The builder adds no food, so that last place is a sight; an outdoor one may end as late as
-// 8 PM. At most the pace's top-up of sights; null unless the day is within the visitor's driving.
+// 8 PM. At most the pace's top-up of sights; over the visitor's driving limit too, as any day may be (owner, 2026-11-24).
 function dayOut(pack, look, prevLast, ans, cands, ends) {
   for (var e = 0; e < ends.length; e++) {
     var end = { siteId: ends[e].id, siteName: ends[e].name, slotIndex: 0, durationSlots: ends[e].slots }, trip = [];
@@ -348,9 +353,7 @@ function dayOut(pack, look, prevLast, ans, cands, ends) {
       if (out[k].slotIndex + p.slots <= addEnd(p) && out[k + 1].slotIndex + end.durationSlots <= addEnd(ends[e]) && fits(pack, look, prevLast, out) &&
         trip.every(function (it, i) { return out[i].slotIndex === it.slotIndex; })) trip = out.slice(0, k + 1);
     }
-    if (!trip.length) continue;
-    var day = packDay(pack, look, prevLast, trip.concat([end]));
-    if (driveOf(pack, look, prevLast.siteId, day) <= ans.drive) return day;
+    if (trip.length) return packDay(pack, look, prevLast, trip.concat([end]));
   }
   return null;
 }
@@ -376,7 +379,9 @@ function personalise(data, pack, ans, route) {
     for (var k = bi - 1; k >= 0; k--) if (days[k] && days[k].items.length) return days[k].items[days[k].items.length - 1];
     return home;
   };
-  route.blocks.forEach(function (b) { if (b) b.items.forEach(function (it) { planned[it.siteId] = true; }); });
+  // a place a day's own block has is kept for it until that day is filled (then it is the day's, or free: a place an earlier
+  // day dropped may go in a later day, 2026-11-24: Edwin Fox for the last day back into Picton)
+  route.blocks.forEach(function (b) { if (b) b.items.forEach(function (it) { planned[it.siteId] = (planned[it.siteId] || 0) + 1; }); });
   var ok = function (p) { return !used[p.id] && (ans.food || !foodOnly(p)); };
   var spare = function (p) { return ok(p) && !planned[p.id] && ONE_DAY.indexOf(p.id) < 0; }; // never add a place the trip already has, or a one-day one
   var inRoute = {};
@@ -486,13 +491,21 @@ function personalise(data, pack, ans, route) {
     // the town's places near its middle, at least one so the night is there, then while the day has fewer than 3 sights.
     // They lead on to the town's middle, not to tomorrow: the night is in the town whichever way the trip goes on.
     var endsShort = function () { return !items.length || places[items[items.length - 1].siteId].area !== b.endTown; };
-    if (whole.length && places[whole[whole.length - 1].siteId].area === b.endTown && endsShort()) {
+    var ownEnd = whole.length && places[whole[whole.length - 1].siteId].area;
+    if (whole.length && endsShort() && (ownEnd === b.endTown || (items.length && places[items[items.length - 1].siteId].area !== ownEnd))) {
       var mid = townSpot(data, pack, b.endTown);
       var central = townPlaces(b.endTown).filter(function (p) { return spare(p) && mayAdd(p, ans) && (!mid || km(mid, p) <= ARRIVE.km); })
         .map(function (p) { return { p: p, s: fitScore(p, ans), k: mid ? km(mid, p) : 0 }; })
         .sort(function (x, y) { return y.s - x.s || (y.p.featured ? 1 : 0) - (x.p.featured ? 1 : 0) || x.k - y.k || (x.p.id < y.p.id ? -1 : 1); })
         .map(function (x) { return x.p; });
       while ((endsShort() || sights() < 3) && add(central, central.length, undefined, items.length, true, mid)) {}
+      var ev = ARRIVE.evening[b.endTown] && places[ARRIVE.evening[b.endTown]];
+      if (endsShort() && ev && spare(ev)) {
+        var last = items[items.length - 1], late = packDay(pack, look, prevLast, items.concat([{ siteId: ev.id, siteName: ev.name, slotIndex: last ? last.slotIndex + last.durationSlots : 0, durationSlots: ev.slots }]));
+        var k = late.length - 1, until = Math.min(late[k].slotIndex + ev.slots, ARRIVE.until);
+        late[k] = { siteId: ev.id, siteName: ev.name, slotIndex: late[k].slotIndex, durationSlots: until - late[k].slotIndex };
+        if (late[k].durationSlots >= 2 && late.slice(0, k).every(function (it, j) { return it.slotIndex === items[j].slotIndex; }) && fits(pack, look, prevLast, late)) items = packDay(pack, look, prevLast, late);
+      }
     }
     // A meal is held near its time, so stops taken out before it can still leave two idle hours or more. A nearby place goes
     // in there if one fits (owner, 2026-11-23): from the town of the stop before the hole or the meal's own town, best fit
@@ -509,8 +522,9 @@ function personalise(data, pack, ans, route) {
     if (b.rest && prevLast && !prevLast.start && sights() < 3) {
       var stayed = sights(), spareSight = function (t) { return townPlaces(t).filter(function (p) { return spare(p) && mayAdd(p, ans); }); };
       var ends = ranked(spareSight(b.endTown), ans).sort(function (x, y) { return addEnd(y) - addEnd(x); }); // outdoor ones first: they keep later
+      var base = townHub(data, pack, b.endTown), reach = function (p) { var l = pack.getLeg(base, p.id, look); return !l.drive || l.slots <= DAY_OUT.slots; };
       nearbyTowns(data, pack, b.endTown).some(function (n) {
-        var trip = !visited[n] && dayOut(pack, look, prevLast, ans, ranked(spareSight(n), ans), ends);
+        var trip = !visited[n] && dayOut(pack, look, prevLast, ans, ranked(spareSight(n).filter(reach), ans), ends);
         if (!trip || trip.length <= stayed) return false; // every stop of a day out is a sight
         items = trip; visited[n] = true;
         return true;
@@ -547,7 +561,11 @@ function personalise(data, pack, ans, route) {
   };
   // A rest day takes what the trip's other days leave (owner, 2026-11-24): every other day first, in order (a rest day still
   // empty then), then the rest days.
-  route.blocks.forEach(function (b, bi) { if (!b.rest) days[bi] = dayOf(b, bi); });
+  route.blocks.forEach(function (b, bi) {
+    if (b.rest) return;
+    days[bi] = dayOf(b, bi);
+    b.items.forEach(function (it) { planned[it.siteId]--; });
+  });
   route.blocks.forEach(function (b, bi) { if (b.rest) days[bi] = dayOf(b, bi); });
   // An afternoon still empty then takes more in the day's town (AFTERNOON), in order, once every day has had its own (a whole
   // rest day before half a day). The night is in the town, so the places head for its middle. A favourite not twice in a day,
@@ -566,6 +584,12 @@ function personalise(data, pack, ans, route) {
       var left = later.filter(function (p) { return !items.some(function (it) { return it.siteId === p.id; }); });
       out = tryAdd(pack, look, prevLast, items, left, b.startTown, left.length, heart, undefined, townSpot(data, pack, b.startTown), items.length, null);
       if (!out) break;
+    }
+    // still empty: one long walk, though the pace leaves them out, when nothing shorter fits (owner, 2026-11-24)
+    if (lastEnd() < AFTERNOON.before) {
+      var walks = townPlaces(b.endTown).filter(function (p) { return spare(p) && longWalk(p) && !mayAdd(p, ans) && !foodOnly(p); })
+        .sort(function (x, y) { return fitScore(y, ans) - fitScore(x, ans) || (y.featured ? 1 : 0) - (x.featured ? 1 : 0) || km(places[last.siteId], x) - km(places[last.siteId], y) || (x.id < y.id ? -1 : 1); });
+      items = tryAdd(pack, look, prevLast, items, walks, b.startTown, walks.length, heart, undefined, townSpot(data, pack, b.startTown), items.length, null) || items;
     }
     items.forEach(function (it) { used[it.siteId] = true; });
     days[bi] = { town: days[bi].town, block: days[bi].block, items: items.map(function (it) {
@@ -692,6 +716,24 @@ function moveEmpty(data, pack, ans, r, p) {
   }
 }
 
+// A stop of a suggested trip moved to another of its days on the website (owner, 2026-11-24, Picton to Christchurch via
+// Kaikōura: "add seal colony to day 2? ... moving ohau point"): out of its day (closed up), after the last stop of day `to`
+// (0 is day 1) and the hop there. The app's trip keeps its own days.
+var MOVES = { "picton-to-christchurch-via-kaikoura": [{ siteId: "ohau-point-seal-colony", to: 1 }] };
+function moveStops(key, blocks, pack, look) {
+  (MOVES[key] || []).forEach(function (m) {
+    var from = -1;
+    blocks.forEach(function (b, i) { if (from < 0 && b.items.some(function (it) { return it.siteId === m.siteId; })) from = i; });
+    if (from < 0 || from === m.to || !blocks[m.to]) return;
+    blocks = blocks.slice();
+    var src = blocks[from], it = src.items.filter(function (x) { return x.siteId === m.siteId; })[0], dst = blocks[m.to], last = dst.items[dst.items.length - 1];
+    var slim = function (x) { return { siteId: x.siteId, siteName: x.siteName, slotIndex: x.slotIndex, durationSlots: x.durationSlots }; };
+    blocks[from] = Object.assign({}, src, { items: closeUp(pack, look, null, src.items, src.items.filter(function (x) { return x !== it; })).map(slim) });
+    blocks[m.to] = Object.assign({}, dst, { items: dst.items.concat([{ siteId: it.siteId, siteName: it.siteName, slotIndex: last.slotIndex + last.durationSlots + pack.getLeg(last.siteId, it.siteId, look).slots, durationSlots: it.durationSlots }]) });
+  });
+  return blocks;
+}
+
 // buildTrips(data, pack, answers) -> up to three trip options, best first.
 // Suggested trips with the same start and length always come first (over-limit days marked); then the best loop
 // and the best one-way built from the blocks, the one-way only when it scores at least as well as the loop.
@@ -729,7 +771,7 @@ function buildTrips(data, pack, ans) {
     r.label = "South Island in " + ans.days + " Days";
   });
   var suggested = data.templates.filter(function (t) { return t.start === ans.start && t.blockIds.length === ans.days; }).map(function (t) {
-    var blocks = t.blockIds.map(function (id) { return ctx.byId[id]; });
+    var blocks = moveStops(t.key, t.blockIds.map(function (id) { return ctx.byId[id]; }), pack, function (id) { return data.places[id]; });
     return { kind: "suggested", key: t.key, label: t.label, blocks: blocks, end: blocks[blocks.length - 1].endTown };
   }).filter(function (r) { return !ans.end || r.end === ans.end; });
   return suggested.concat(built).slice(0, 3).map(function (r) {
@@ -740,4 +782,4 @@ function buildTrips(data, pack, ans) {
   }).filter(Boolean);
 }
 
-if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, FAVOURITES: FAVOURITES, START_MORNING: START_MORNING, START_PUSH: START_PUSH, ARRIVE: ARRIVE, AFTERNOON: AFTERNOON };
+if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, FAVOURITES: FAVOURITES, START_MORNING: START_MORNING, START_PUSH: START_PUSH, ARRIVE: ARRIVE, AFTERNOON: AFTERNOON, MOVES: MOVES, moveStops: moveStops };

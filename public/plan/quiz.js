@@ -66,6 +66,11 @@ var DRIVES = [
   { id: 240, label: "Some", hint: "Up to 4 hours a day" },
   { id: 360, label: "Happy to drive", hint: "Up to 6 hours a day" },
 ];
+// A long way in few days: the drive between the start's and the finish's hubs (the app's own, test/quiz.test.js checks it
+// against pack.js), spread over the days, is over 2 hours a day. The driving isn't asked then: Happy to drive (owner,
+// 2026-11-24: "dont ask them about it on those short long distance trips"). Each: the fewest days 2 hours a day covers.
+var LONG_DRIVES = { christchurch: { picton: 3 }, picton: { christchurch: 3 }, dunedin: { christchurch: 3, picton: 5, nelson: 5 }, invercargill: { christchurch: 4, picton: 6, nelson: 7 } };
+function longDrive(start, end, days) { return !!(LONG_DRIVES[start] && LONG_DRIVES[start][end] > days); }
 // Who's travelling, their age and how they heard of the app (owner, 2026-11-24): kept with the quiz answers (analytics) only,
 // the trip the same whatever they say. Age and how they heard can be skipped ("skip").
 var WHO = [
@@ -361,7 +366,7 @@ function stepFromHash(hash) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { STEPS: STEPS, TOWNS: TOWNS, BANDS: BANDS, MIN_DAYS: MIN_DAYS, minDays: minDays, leastFrom: leastFrom, endsFor: endsFor, finishCards: finishCards, PACES: PACES, WHO: WHO, AGES: AGES, HEARD: HEARD, backStep: backStep, deckStart: deckStart, cardsFor: cardsFor, deckAnswers: deckAnswers, deckYes: deckYes, deckAnswer: deckAnswer, deckKey: deckKey, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine, summaryLine: summaryLine, retryLoad: retryLoad, waitScreen: waitScreen };
+  module.exports = { STEPS: STEPS, TOWNS: TOWNS, BANDS: BANDS, MIN_DAYS: MIN_DAYS, minDays: minDays, leastFrom: leastFrom, endsFor: endsFor, finishCards: finishCards, PACES: PACES, WHO: WHO, AGES: AGES, HEARD: HEARD, LONG_DRIVES: LONG_DRIVES, longDrive: longDrive, backStep: backStep, deckStart: deckStart, cardsFor: cardsFor, deckAnswers: deckAnswers, deckYes: deckYes, deckAnswer: deckAnswer, deckKey: deckKey, ACTIVITIES: ACTIVITIES, monthsOf: monthsOf, startDateFor: startDateFor, seasonOf: seasonOf, seasonLine: seasonLine, stepFromHash: stepFromHash, tripPhotos: tripPhotos, stopPhoto: stopPhoto, SEP: SEP, dots: dots, firstOpenStep: firstOpenStep, cleanState: cleanState, activitiesFor: activitiesFor, answersFor: answersFor, revealState: revealState, breakLine: breakLine, measureParams: measureParams, driveLine: driveLine, summaryLine: summaryLine, retryLoad: retryLoad, waitScreen: waitScreen };
 }
 
 // ---- the page ----
@@ -592,7 +597,7 @@ if (typeof document !== "undefined") (function () {
         DRIVES.map(function (d) { return choice(d.label, d.hint, "drive", d.id, st.drive === d.id); }).join("");
     },
     who: function () {
-      return '<p class="q-kicker">' + esc(DRIVES.filter(function (d) { return d.id === st.drive; })[0].hint) + '</p><h1 tabindex="-1">Who’s travelling?</h1>' +
+      return '<p class="q-kicker">' + esc(longDrive(st.start, st.end, st.days) ? labelOf(PACES, st.pace) : DRIVES.filter(function (d) { return d.id === st.drive; })[0].hint) + '</p><h1 tabindex="-1">Who’s travelling?</h1>' +
         WHO.map(function (w) { return choice(w.label, w.hint, "who", w.id, st.who === w.id); }).join("");
     },
     age: function () {
@@ -859,7 +864,7 @@ if (typeof document !== "undefined") (function () {
     else if (act === "no") decide(false);
     else if (act === "season") { answered("season", v); st.season = v; st.month = null; st.pick = null; save(); go(v === "unsure" ? S.pace : S.month); }
     else if (act === "month") { answered("month", v || "none"); var p = v ? v.split("-") : null; st.month = p ? { month: +p[0], year: +p[1] } : null; st.pick = null; save(); go(S.pace); }
-    else if (act === "pace") { answered("pace", v); st.pace = v; st.pick = null; save(); go(S.drive); }
+    else if (act === "pace") { answered("pace", v); st.pace = v; st.pick = null; var far = longDrive(st.start, st.end, st.days); if (far) st.drive = 360; save(); go(far ? S.who : S.drive); }
     else if (act === "drive") { answered("drive", v); st.drive = +v; st.pick = null; save(); go(S.who); }
     else if (act === "who") { answered("who", v); st.who = v; save(); go(S.age); }
     else if (act === "age") { answered("age", v); st.age = v; save(); go(S.vibe); }

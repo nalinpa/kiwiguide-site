@@ -158,6 +158,20 @@ test("fewest days: every start and finish, true to the builder (it gets a trip a
   }
 });
 
+test("no driving question where the start and the finish are far apart for the days: Happy to drive, 6 hours (owner, 2026-11-24)", () => {
+  // "dont ask them about it on those short long distance trips": the drive between the two towns' hubs, spread over the days,
+  // over 2 hours a day
+  const pack = req("../public/plan/pack.js"), look = (id) => data.places[id];
+  for (const s of Q.TOWNS) for (const e of Q.TOWNS) for (let d = Q.minDays(s.id, e.id); d <= 21; d++) {
+    const mins = s.id === e.id ? 0 : pack.getLeg(pack.hubs[s.id], pack.hubs[e.id], look).slots * 30;
+    assert.equal(Q.longDrive(s.id, e.id, d), mins / d > 120, `${s.id} to ${e.id} in ${d} days: ${mins} minutes`);
+  }
+  assert.deepEqual(Q.LONG_DRIVES, { christchurch: { picton: 3 }, picton: { christchurch: 3 }, dunedin: { christchurch: 3, picton: 5, nelson: 5 }, invercargill: { christchurch: 4, picton: 6, nelson: 7 } });
+  // after How active?: straight to Who's travelling with Happy to drive set, and its kicker the pace, not a driving answer
+  assert.match(src, /act === "pace"\) \{ answered\("pace", v\); st\.pace = v; st\.pick = null; var far = longDrive\(st\.start, st\.end, st\.days\); if \(far\) st\.drive = 360; save\(\); go\(far \? S\.who : S\.drive\); \}/);
+  assert.match(src, /esc\(longDrive\(st\.start, st\.end, st\.days\) \? labelOf\(PACES, st\.pace\) : DRIVES\.filter\(function \(d\) \{ return d\.id === st\.drive; \}\)\[0\]\.hint\)/);
+});
+
 test("how active: Easy, Some walking, Lots of walking", () => {
   assert.deepEqual(Q.PACES.map((p) => p.label), ["Easy", "Some walking", "Lots of walking"]);
 });

@@ -8,11 +8,47 @@ const { monthsOf, startDateFor, stepFromHash, seasonOf, seasonLine, STEPS } = Q;
 const data = JSON.parse(readFileSync(new URL("../public/plan/builder-data.json", import.meta.url), "utf8"));
 const NOV20 = new Date(2026, 10, 20);
 const at = (name) => STEPS.indexOf(name);
-const full = { start: "dunedin", end: "dunedin", band: "fortnight", days: 12, season: "summer", month: { month: 0, year: 2027 }, pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"], pick: "built-dunedin-12-loop" };
+const full = { start: "dunedin", end: "dunedin", band: "fortnight", days: 12, season: "summer", month: { month: 0, year: 2027 }, pace: "some", drive: 240, who: "couple", age: "30-44", vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"], heard: "google", pick: "built-dunedin-12-loop" };
 const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
 
-test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities", () => {
-  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "vibe", "break2", "into", "food", "choice", "reveal", "account", "done"]);
+test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities; who's travelling and age after the driving, how did you hear about us the last question", () => {
+  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "choice", "reveal", "account", "done"]);
+  // the progress bar grows in the order asked, every step on it
+  const bar = JSON.parse(src.match(/var PROGRESS = (\{[^}]*\});/)[1].replace(/(\w+):/g, '"$1":'));
+  assert.deepEqual(Object.keys(bar), STEPS);
+  STEPS.forEach((s, i) => { if (i) assert.ok(bar[s] >= bar[STEPS[i - 1]], s); });
+});
+
+test("who's travelling, age and how did you hear about us: kept with the quiz answers (analytics) only, the trip the same; age and how you heard can be skipped (owner, 2026-11-24)", () => {
+  assert.deepEqual(Q.WHO.map((w) => [w.id, w.label]), [["solo", "Solo"], ["couple", "Couple"], ["family", "Family"], ["group", "Group"]]);
+  assert.deepEqual(Q.AGES.map((a) => a.label), ["18–29", "30–44", "45–59", "60+"]);
+  assert.deepEqual(Q.HEARD.map((h) => h.label), ["App Store", "Google", "Instagram or TikTok", "A friend", "Other"]);
+  // a skip is an answer; a bad answer drops it and everything after
+  assert.equal(Q.cleanState({ ...full, age: "skip" }, NOV20).age, "skip");
+  assert.equal(Q.cleanState({ ...full, heard: "skip" }, NOV20).pick, "built-dunedin-12-loop");
+  const w = Q.cleanState({ ...full, who: "constructor" }, NOV20);
+  assert.deepEqual([w.drive, w.who, w.age, w.vibes], [240, null, null, null]);
+  const a = Q.cleanState({ ...full, age: "12" }, NOV20);
+  assert.deepEqual([a.who, a.age, a.vibes], ["couple", null, null]);
+  const h = Q.cleanState({ ...full, heard: "tv" }, NOV20);
+  assert.deepEqual([h.food, h.heard, h.pick], [true, null, null]);
+  // a reload can't land past them
+  assert.equal(Q.firstOpenStep({ ...full, who: null }, at("vibe")), at("who"));
+  assert.equal(Q.firstOpenStep({ ...full, age: null }, at("into")), at("age"));
+  assert.equal(Q.firstOpenStep({ ...full, heard: null }, at("reveal")), at("heard"));
+  // never in the builder's answers or the reveal and save events' params
+  assert.deepEqual(Object.keys(Q.answersFor(full)).sort(), ["activities", "days", "drive", "end", "food", "into", "pace", "start", "vibes"]);
+  assert.deepEqual(Object.keys(Q.measureParams({ kind: "built", days: [], start: "dunedin", end: "dunedin" }, full)).sort(), ["days", "drive", "end", "kind", "pace", "start"]);
+  // each answer is a quiz step (analytics); the trip picked stays (the trips don't change); Skip on age and how you heard
+  assert.match(src, /act === "drive"\) \{ answered\("drive", v\); st\.drive = \+v; st\.pick = null; save\(\); go\(S\.who\); \}/);
+  assert.match(src, /act === "who"\) \{ answered\("who", v\); st\.who = v; save\(\); go\(S\.age\); \}/);
+  assert.match(src, /act === "age"\) \{ answered\("age", v\); st\.age = v; save\(\); go\(S\.vibe\); \}/);
+  assert.match(src, /act === "food"\) \{ answered\("food", v\); st\.food = v === "yes"; st\.pick = null; save\(\); go\(S\.heard\); \}/);
+  assert.match(src, /act === "heard"\) \{ answered\("heard", v\); st\.heard = v; save\(\); go\(S\.choice\); \}/);
+  assert.match(src, /<h1 tabindex="-1">Who’s travelling\?<\/h1>/);
+  assert.match(src, /<h1 tabindex="-1">How old are you\?<\/h1>/);
+  assert.match(src, /<h1 tabindex="-1">How did you hear about us\?<\/h1>/);
+  assert.equal((src.match(/data-act="(age|heard)" data-val="skip">Skip<\/button>/g) || []).length, 2);
 });
 
 test("start screen: Queenstown, Christchurch and Picton, then Somewhere else? (Dunedin's photo) for the rest", () => {
@@ -62,7 +98,7 @@ test("where does your trip finish: only the towns the days can reach; the start 
   // the towns on offer, in the towns' order
   assert.deepEqual(Q.endsFor("queenstown", 3), ["queenstown", "dunedin", "invercargill"]);
   assert.deepEqual(Q.endsFor("queenstown", 4), ["queenstown", "christchurch", "dunedin", "invercargill"]);
-  assert.deepEqual(Q.endsFor("invercargill", 2), ["dunedin"], "back to Invercargill needs 7 days");
+  assert.deepEqual(Q.endsFor("invercargill", 2), ["queenstown", "dunedin", "invercargill"], "Queenstown, and back to Invercargill, in 2 by the day to Te Anau");
   assert.deepEqual(Q.endsFor("invercargill", 7), ["queenstown", "christchurch", "picton", "dunedin", "nelson", "invercargill"]);
   assert.deepEqual(Q.endsFor("nelson", 2), ["nelson"]);
   // never an empty screen, and never a town the days can't reach
@@ -78,7 +114,7 @@ test("where does your trip finish: only the towns the days can reach; the start 
   assert.deepEqual(F("queenstown", 7, true), { home: true, towns: ["christchurch", "picton", "dunedin", "nelson", "invercargill"], behind: [] });
   assert.deepEqual(F("queenstown", 4, false), { home: true, towns: ["christchurch", "dunedin", "invercargill"], behind: [] }, "four cards: nothing hidden");
   assert.deepEqual(F("queenstown", 3, false), { home: true, towns: ["dunedin", "invercargill"], behind: [] });
-  assert.deepEqual(F("invercargill", 2, false), { home: false, towns: ["dunedin"], behind: [] });
+  assert.deepEqual(F("invercargill", 2, false), { home: true, towns: ["queenstown", "dunedin"], behind: [] });
   assert.deepEqual(F("dunedin", 21, false), { home: true, towns: ["queenstown", "christchurch", "picton"], behind: ["nelson", "invercargill"] });
   assert.deepEqual(F("dunedin", 4, false), { home: true, towns: ["queenstown", "christchurch", "picton", "nelson"], behind: [] }, "one extra town is a card, not a Somewhere else? of one");
   for (const t of Q.TOWNS) for (let d = 2; d <= 21; d++) for (const open of [false, true]) {

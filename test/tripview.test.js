@@ -18,20 +18,32 @@ const base = { pace: "some", drive: 240, vibes: ["nature", "relax"], into: ["Sce
 const dated = (o, start) => ({ ...o, days: o.days.map((d, i) => ({ ...d, date: tripBody(o, start, String).days[i].date, items: d.items.map((it) => ({ ...it, thumb: lookup(it.siteId).thumb, fallback: lookup(it.siteId).fallback })) })) });
 const dunedin = dated(buildTrips(data, pack, { ...base, start: "dunedin", days: 12 })[0], "2027-01-01");
 const inv = dated(buildTrips(data, pack, { ...base, start: "invercargill", days: 21 })[0], "2027-01-01");
-// A trip with a day left empty: rest days are spent in their town or out to a nearby one (owner, 2026-11-24), but on day 17
-// of Christchurch to Queenstown in 18 days at 2 hours a day every Wānaka place is already in the trip, and Queenstown is too
-// far there and back. The next day opens with the drive from Wānaka.
-const rest = dated(buildTrips(data, pack, { ...base, start: "christchurch", days: 18, drive: 120, food: false })[0], "2027-01-01");
+// A trip with a day left empty, as the app takes one. The builder no longer leaves one (a day its town can't fill moves,
+// owner 2026-11-24), but a trip can still have one, so the fixture puts one in: Christchurch to Queenstown in 18 days at 2
+// hours a day, food off, an empty day where the traveller is, before the first day that opens with a drive of over half an
+// hour to another town (the day view names both towns on one that long).
+const rest = (() => {
+  const o = buildTrips(data, pack, { ...base, start: "christchurch", days: 18, drive: 120, food: false })[0];
+  const area = (it) => lookup(it.siteId).area;
+  const j = o.days.findIndex((d, i) => i > 1 && d.items.length && o.days[i - 1].items.length && area(d.items[0]) !== area(o.days[i - 1].items.at(-1)) &&
+    pack.getLeg(o.days[i - 1].items.at(-1).siteId, d.items[0].siteId, lookup).slots > 1);
+  const at = area(o.days[j - 1].items.at(-1));
+  return dated({ ...o, days: [...o.days.slice(0, j), { town: at, block: "rest-" + at, free: true, items: [] }, ...o.days.slice(j)] }, "2027-01-01");
+})();
 // The app's days as TripOverview gets them: an id on every day and item.
 const appDays = (o) => o.days.map((d, i) => ({ id: "day_" + (i + 1), date: d.date, items: d.items.map((it, k) => ({ ...it, id: i + "_" + k })) }));
-// The app's dayStartSiteId: the last stop of the last earlier day that has one.
-const startFrom = (o, n) => o.days.slice(0, n).filter((d) => d.items.length).pop()?.items.at(-1).siteId;
+// Where the trip starts, as a day before day 1 with one stop at the start town's hub: the app's own functions then give
+// day 1 its opening drive from there (owner, 2026-11-24: day 1 is timed from the start town; the app's days don't know it).
+const lead = (o) => ({ id: "start", items: [{ id: "start", siteId: pack.hubs[o.start], slotIndex: 0, durationSlots: 1 }] });
+const summary = (o) => pack.tripSummary([lead(o)].concat(appDays(o)), lookup).slice(1);
+// The app's dayStartSiteId: the last stop of the last earlier day that has one (before day 1, the start town's hub).
+const startFrom = (o, n) => o.days.slice(0, n).filter((d) => d.items.length).pop()?.items.at(-1).siteId ?? pack.hubs[o.start];
 // TripOverview's own row words (components/itinerary/TripOverview.tsx).
 const appMeta = (s) => s.placeCount === 0 ? "Nothing planned yet"
   : `${s.placeCount} ${s.placeCount === 1 ? "place" : "places"}` + (s.driveSlots > 0 ? ` · ${pack.slotsToDurationLabel(s.driveSlots).toLowerCase()} driving` : "");
 
 test("rows match the app: date, route, places and driving, photo", () => {
-  const rows = TV.tripRows(dunedin, pack, lookup), sum = pack.tripSummary(appDays(dunedin), lookup);
+  const rows = TV.tripRows(dunedin, pack, lookup), sum = summary(dunedin);
   assert.equal(rows.length, 12);
   rows.forEach((r, i) => {
     assert.equal(r.day, i + 1);
@@ -53,7 +65,7 @@ test("rows match the app: date, route, places and driving, photo", () => {
 
 test("opening drive: 'Starts with the drive from <town>' exactly when tripSummary has one", () => {
   for (const o of [dunedin, inv]) {
-    const rows = TV.tripRows(o, pack, lookup), sum = pack.tripSummary(appDays(o), lookup);
+    const rows = TV.tripRows(o, pack, lookup), sum = summary(o);
     rows.forEach((r, i) => {
       const od = sum[i].openingDrive;
       assert.equal(r.opening, od ? "Starts with the drive from " + pack.areaName(od.fromArea) : null, "day " + (i + 1));
@@ -79,10 +91,11 @@ test("free day: a row and a day view in the app's empty-day form", () => {
   assert.equal(tl.filter((x) => x.kind === "hour").length, 15);
   assert.match(TV.renderDay(tl), /Nothing here yet/);
   // the day after it still opens with the drive from where the traveller last was (dayStartSiteId skips the free day)
-  const sum = pack.tripSummary(appDays(rest), lookup);
-  const opening = TV.dayView(rest, n + 1, pack, lookup).filter((x) => x.kind === "drive" && x.title.startsWith("Drive to") && x.slot === 0);
+  const sum = summary(rest), first = rest.days[n + 1].items[0].slotIndex;
+  const opening = TV.dayView(rest, n + 1, pack, lookup).filter((x) => x.kind === "drive" && x.title.startsWith("Drive to") && x.slot + x.slots <= first);
   assert.equal(opening.length, sum[n + 1].openingDrive ? 1 : 0);
   assert.ok(sum[n + 1].openingDrive, "the day after opens with a drive");
+  assert.ok(opening[0].via.startsWith(pack.areaName(sum[n + 1].openingDrive.fromArea) + " to "), opening[0].via);
 });
 
 test("timeline: stops at their slots with the app's time range, a drive item per leg, hour lines 8 AM to 10 PM", () => {
@@ -92,7 +105,7 @@ test("timeline: stops at their slots with the app's time range, a drive item per
   for (const o of [dunedin, inv]) {
     const days = appDays(o);
     for (let n = 0; n < days.length; n++) {
-      const prev = o.days.slice(0, n).filter((d) => d.items.length).pop();
+      const prev = o.days.slice(0, n).filter((d) => d.items.length).pop() || lead(o);
       const tl = TV.dayTimeline(o.days[n], prev, pack, lookup);
       assert.deepEqual(tl, TV.dayView(o, n, pack, lookup));
       const stops = tl.filter((x) => x.kind === "stop");
@@ -133,6 +146,23 @@ test("timeline: stops at their slots with the app's time range, a drive item per
   assert.ok(html.includes(`<use href="/img/icons.svg?v=${v}#car"/>`), "icons.svg?v=" + v);
 });
 
+test("day 1 opens with the drive from the start town when its first stop is in another (owner, 2026-11-24)", () => {
+  // Dunedin to Christchurch in 3 days: day 1 goes up the coast from Kātiki Point
+  const o = dated(buildTrips(data, pack, { ...base, start: "dunedin", end: "christchurch", days: 3 })[0], "2027-01-01");
+  const first = o.days[0].items[0], to = pack.areaName(lookup(first.siteId).area);
+  assert.notEqual(lookup(first.siteId).area, "dunedin", "day 1 starts out of town");
+  const row = TV.tripRows(o, pack, lookup)[0], sum = summary(o)[0];
+  assert.ok(sum.openingDrive && sum.driveSlots > 0, "the app's summary from the start town's hub has the drive");
+  assert.equal(row.opening, "Starts with the drive from Dunedin");
+  assert.equal(row.meta, appMeta(sum));
+  const opening = TV.dayView(o, 0, pack, lookup).filter((x) => x.kind === "drive" && x.slot + x.slots <= first.slotIndex);
+  assert.equal(opening.length, 1);
+  assert.equal(opening[0].title, "Drive to " + to);
+  assert.equal(opening[0].via, "Dunedin to " + to);
+  // a trip that starts where its first stop is: nothing before it (Dunedin's day 1 is in Dunedin)
+  assert.equal(TV.tripRows(dunedin, pack, lookup)[0].opening, null);
+});
+
 test("option switch: the open day is kept when it exists, else the last day", () => {
   assert.equal(TV.clampDay(6, dunedin), 6);
   assert.equal(TV.clampDay(6, { days: dunedin.days.slice(0, 5) }), 4);
@@ -150,9 +180,10 @@ test("no editing: the Days view has no drag handle or control", () => {
 });
 
 test("long drive: the row says so", () => {
-  const rows = TV.tripRows(dunedin, pack, lookup), n = dunedin.days.findIndex((d) => d.overLimit);
-  assert.equal(rows[n].overLimit, dunedin.days[n].driveMinutes);
-  assert.equal(rows.filter((r) => r.overLimit).length, dunedin.days.filter((d) => d.overLimit).length);
+  // (Christchurch to Queenstown in 18 days at 2 hours a day has long days; Dunedin in 12 at 4 hours no longer does)
+  const rows = TV.tripRows(rest, pack, lookup), n = rest.days.findIndex((d) => d.overLimit);
+  assert.equal(rows[n].overLimit, rest.days[n].driveMinutes);
+  assert.equal(rows.filter((r) => r.overLimit).length, rest.days.filter((d) => d.overLimit).length);
   assert.match(TV.renderTrip([{ ...rows[n], warn: "About 5 h of driving." }]), /<b>Long drive\.<\/b> About 5 h of driving\./);
   assert.doesNotMatch(TV.renderTrip([{ ...rows[n], warn: "" }]), /Long drive/);
 });
@@ -258,7 +289,7 @@ test("cascade: an unbalanced { fails the run instead of hanging it", () => {
 test("open row: every word on it keeps 4.5:1 on the row's fill, light and dark (as the app's detailSelected)", () => {
   const css = read("styles.css");
   // every line a row can show: the long-drive day with an opening drive and "Runs past 10 PM" forced on, and a free day
-  const rows = TV.tripRows(dunedin, pack, lookup), n = dunedin.days.findIndex((d) => d.overLimit);
+  const rows = TV.tripRows(rest, pack, lookup), n = rest.days.findIndex((d, i) => d.overLimit && rows[i].opening);
   const all = { ...rows[n], overflows: true, warn: "About 5 h of driving. Over your 4 h limit." };
   const free = TV.tripRows(rest, pack, lookup)[rest.days.findIndex((d) => d.free)];
   assert.ok(all.opening && all.route && free.meta === "Nothing planned yet");

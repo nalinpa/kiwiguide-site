@@ -25,10 +25,18 @@
     return (p[1] === end.split(" ")[1] ? p[0] : start) + " – " + end;
   }
 
+  // Where the trip starts, as a day before day 1 with one stop at the start town's hub: the app's own functions then give
+  // day 1 its opening drive from there, as any later day's from where the day before ended (owner, 2026-11-24: day 1 is
+  // timed from the start town; the app's days don't know it). None when the hub isn't a place.
+  function startDay(option, pack, lookup) {
+    var hub = option.start && pack.hubs[option.start];
+    return hub && lookup(hub) ? { items: [{ siteId: hub, slotIndex: 0, durationSlots: 1 }] } : undefined;
+  }
+
   // One row per day, as TripOverview words it. `overLimit` is the day's driving in minutes when it is over the
   // visitor's limit (the quiz adds the line itself as `warn`, since only it knows the limit).
   function tripRows(option, pack, lookup) {
-    var sum = pack.tripSummary(option.days, lookup);
+    var lead = startDay(option, pack, lookup), sum = pack.tripSummary((lead ? [lead] : []).concat(option.days), lookup).slice(lead ? 1 : 0);
     return option.days.map(function (d, i) {
       var s = sum[i];
       return {
@@ -47,7 +55,7 @@
   }
 
   // A day's timeline: hour lines 8 AM to 10 PM, then the stops and drives in the order of the day. `prevDay` is
-  // the last earlier day with a stop (the app's dayStartSiteId: a free day doesn't move the traveller).
+  // the last earlier day with a stop (the app's dayStartSiteId: a free day doesn't move the traveller), else the start.
   function dayTimeline(day, prevDay, pack, lookup) {
     var hours = [], items = [];
     for (var h = 0; h <= LAST_SLOT; h += 2) hours.push({ kind: "hour", slot: h, slots: 1, label: pack.slotIndexToTimeLabel(h).replace(":00", "") });
@@ -65,7 +73,7 @@
     return hours.concat(items.sort(function (x, y) { return x.slot - y.slot; }));
   }
   function dayView(option, n, pack, lookup) {
-    return dayTimeline(option.days[n], option.days.slice(0, n).filter(function (d) { return d.items.length; }).pop(), pack, lookup);
+    return dayTimeline(option.days[n], option.days.slice(0, n).filter(function (d) { return d.items.length; }).pop() || startDay(option, pack, lookup), pack, lookup);
   }
   function clampDay(n, option) { return Math.max(0, Math.min(option.days.length - 1, n | 0)); }
 

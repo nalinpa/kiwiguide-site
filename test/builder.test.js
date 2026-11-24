@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 const require = createRequire(import.meta.url);
-const { buildTrips, TOWNS_RANKED, townCost, TOP_UP, onWay, townSpot, closeUp, mayAdd, ONE_DAY, nearbyTowns, DAY_OUT } = require("../public/plan/builder.js");
+const { buildTrips, TOWNS_RANKED, townCost, TOP_UP, onWay, townSpot, closeUp, mayAdd, ONE_DAY, nearbyTowns, DAY_OUT, BEACH_DAY } = require("../public/plan/builder.js");
+// A beach day's beach (Kaiteriteri on an Abel Tasman day with no other sight) may be a place the trip has been to before
+const beachDayStop = (d, it) => BEACH_DAY[d.town] === it.siteId && d.items.every((x) => x === it || foodOnly(data.places[x.siteId]));
 const bsrc = readFileSync(new URL("../public/plan/builder.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const Q = require("../public/plan/quiz.js");
 const pack = require("../public/plan/pack.js");
@@ -133,12 +135,13 @@ test("the app would not move a thing", () => {
 
 test("no forbidden stops", () => {
   for (const { answers, options } of sweep) for (const o of options) {
-    const all = o.days.flatMap((d) => d.items.map((it) => it.siteId));
+    // a beach day may go back to a beach the trip has been to (owner, 2026-11-24); it doesn't count as a second visit here
+    const all = o.days.flatMap((d) => d.items.filter((it) => !beachDayStop(d, it)).map((it) => it.siteId));
     for (const d of o.days) for (const it of d.items) {
       assert.ok(data.places[it.siteId], it.siteId);
       const added = !blockOf(d).items.some((x) => x.siteId === it.siteId);
       // a hand-checked block keeps its own repeats; a stop the builder adds is never anywhere else in the trip
-      if (added) assert.equal(all.filter((id) => id === it.siteId).length, 1, `${name(answers)} ${o.key} adds ${it.siteId} twice`);
+      if (added && !beachDayStop(d, it)) assert.equal(all.filter((id) => id === it.siteId).length, 1, `${name(answers)} ${o.key} adds ${it.siteId} twice`);
       assert.deepEqual(Object.keys(it).sort(), ["durationLabel", "durationSlots", "siteId", "siteName", "slotIndex", "timeLabel"]);
     }
   }
@@ -289,11 +292,11 @@ test("built days have at least 2 non-Food stops unless nothing more fits", () =>
   });
 });
 
-test("built trips never repeat a place, except Food places", () => {
+test("built trips never repeat a place, except Food places and a beach day's beach", () => {
   for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") {
     const day = {};
     o.days.forEach((d, i) => d.items.forEach((it) => {
-      if (foodOnly(data.places[it.siteId])) return;
+      if (foodOnly(data.places[it.siteId]) || beachDayStop(d, it)) return;
       assert.ok(day[it.siteId] === undefined, `${name(answers)} ${o.key} ${it.siteId} on days ${day[it.siteId] + 1} and ${i + 1}`);
       day[it.siteId] = i;
     }));
@@ -807,6 +810,40 @@ test("food-only days: a day left with no sight takes its own towns' places, also
     assert.equal(someCandidateFits(o, i, { food: answers.food, arrive: true }), null, name(answers) + " " + o.key + " day " + (i + 1));
   });
   console.log(`food-only days: ${n} of ${days}`);
+});
+
+test("Abel Tasman: a day left with no sight is a beach day at Kaiteriteri (owner, 2026-11-24)", () => {
+  assert.deepEqual(BEACH_DAY, { "abel-tasman": "kaiteriteri-beach" });
+  const beach = data.places["kaiteriteri-beach"];
+  let days = 0, beachDays = 0, again = 0;
+  for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") o.days.forEach((d, i) => {
+    if (d.town !== "abel-tasman") return;
+    days++;
+    const why = name(answers) + " " + o.key + " day " + (i + 1);
+    // never a day there with nothing to see
+    assert.ok(d.items.some((it) => !foodOnly(data.places[it.siteId])), why + ": " + d.items.map((it) => it.siteId).join(", "));
+    const k = d.items.findIndex((it) => beachDayStop(d, it));
+    if (k < 0) return;
+    beachDays++;
+    if (o.days.some((x, j) => j !== i && x.items.some((it) => it.siteId === beach.id))) again++;
+    // the time between the day's stops: from 10 AM at the earliest when it opens the day, to the next stop (less the drive)
+    // or for 6 hours at most, done by 8 PM (an outdoor stop the builder adds); never shorter than the beach's own 3 hours
+    const it = d.items[k], next = d.items[k + 1];
+    if (k === 0) assert.ok(it.slotIndex >= 4, why + ": opens before 10 AM");
+    const to = next ? next.slotIndex - pack.getLeg(it.siteId, next.siteId, lookup).slots : 24;
+    assert.equal(it.durationSlots, Math.max(beach.slots, Math.min(to - it.slotIndex, 12)), why);
+    assert.ok(it.slotIndex + it.durationSlots <= 24, why + ": past 8 PM");
+  });
+  console.log(`Abel Tasman days: ${days}, beach days: ${beachDays} (${again} at a beach the trip has been to)`);
+  assert.ok(beachDays >= 3 && again >= 1, beachDays + " beach days");
+  // the owner's case: Christchurch to Picton in 14 days, Easy, food on: day 12 was two cafés (TOAD Hall, Park Café Mārahau)
+  const o = buildTrips(data, pack, { start: "christchurch", end: "picton", days: 14, drive: 120, pace: "easy", food: true, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }).find((x) => x.key === "built-christchurch-14-oneway");
+  const d = o.days[11];
+  assert.equal(d.block, "toad-hall-motueka..park-cafe-marahau@abel-tasman");
+  assert.deepEqual(d.items.map((it) => it.siteId), ["toad-hall-motueka", "kaiteriteri-beach", "park-cafe-marahau"]);
+  const [cafe, sand, dinner] = d.items;
+  assert.equal(sand.slotIndex + sand.durationSlots, dinner.slotIndex - pack.getLeg(sand.siteId, dinner.siteId, lookup).slots, "the beach until it's time for dinner");
+  assert.ok(sand.slotIndex <= cafe.slotIndex + cafe.durationSlots + pack.getLeg(cafe.siteId, sand.siteId, lookup).slots);
 });
 
 test("same answers, same trip", () => {

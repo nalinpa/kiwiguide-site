@@ -37,6 +37,9 @@ function byId(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; }
 // Open one day a week: the builder doesn't know which weekday a trip day falls on, so it never adds these by itself
 // (owner, 2026-11-23: Motueka Sunday Market). None is in a hand-checked day; one that was would stay there.
 var ONE_DAY = ["motueka-sunday-market", "nelson-saturday-market"];
+// A day in Abel Tasman with no sight left is a beach day at Kaiteriteri (owner, 2026-11-24): from 10 AM at the earliest,
+// at most 6 hours (half-hour slots from 8 AM).
+var BEACH_DAY = { "abel-tasman": "kaiteriteri-beach" }, BEACH = { from: 4, most: 12 };
 
 // One point each for a picked vibe, a picked category, a picked activity, and a long walk for big hikers.
 function fitScore(p, ans) {
@@ -447,6 +450,19 @@ function personalise(data, pack, ans, route) {
         return true;
       });
     }
+    // A day in a beach town left with no sight is a beach day (owner, 2026-11-24): the town's beach, even one the trip has
+    // been to, for the time between the day's stops: from 10 AM at the earliest when it opens the day, to the next stop (less
+    // the drive) or for 6 hours at most, done by 8 PM like any outdoor stop the builder adds; never shorter than its own time.
+    var beach = !sights() && places[BEACH_DAY[b.endTown]];
+    if (beach && add([beach], 1)) {
+      var bk = items.map(function (it) { return it.siteId; }).indexOf(beach.id), sand = items[bk], after = items[bk + 1];
+      var open = bk ? sand.slotIndex : Math.max(sand.slotIndex, BEACH.from);
+      var till = after ? after.slotIndex - pack.getLeg(beach.id, after.siteId, look).slots : addEnd(beach);
+      var long = items.slice();
+      long[bk] = { siteId: sand.siteId, siteName: sand.siteName, slotIndex: open, durationSlots: Math.max(beach.slots, Math.min(till - open, BEACH.most)) };
+      var timed = packDay(pack, look, prevLast, long);
+      if (timed.every(function (it, j) { return it.slotIndex === long[j].slotIndex; }) && fits(pack, look, prevLast, timed)) items = timed;
+    }
     // The one final check every returned day passes, whatever removed or added its stops: packTrip moves nothing
     // and nothing ends after 10 PM; otherwise drop the last stop and time the day again.
     while (items.length && !fits(pack, look, prevLast, items)) items = packDay(pack, look, prevLast, items.slice(0, -1));
@@ -525,4 +541,4 @@ function buildTrips(data, pack, ans) {
   }).filter(Boolean);
 }
 
-if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT };
+if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, BEACH_DAY: BEACH_DAY };

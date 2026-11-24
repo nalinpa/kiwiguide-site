@@ -37,9 +37,15 @@ function byId(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; }
 // Open one day a week: the builder doesn't know which weekday a trip day falls on, so it never adds these by itself
 // (owner, 2026-11-23: Motueka Sunday Market). None is in a hand-checked day; one that was would stay there.
 var ONE_DAY = ["motueka-sunday-market", "nelson-saturday-market"];
-// A day in Abel Tasman with no sight left is a beach day at Kaiteriteri (owner, 2026-11-24): from 10 AM at the earliest,
-// at most 6 hours (half-hour slots from 8 AM).
-var BEACH_DAY = { "abel-tasman": "kaiteriteri-beach" }, BEACH = { from: 4, most: 12 };
+// A town's favourites (owner, 2026-11-24): a day ending there with no sight left goes back to them, in order, even ones the
+// trip has been to: Kaiteriteri Beach in Abel Tasman (a beach day); Queenstown Gardens, then the lakefront at Queenstown Bay
+// Beach. From 10 AM at the earliest when they open the day; the last fills the time to the day's next stop (less the drive)
+// or to 6 hours after the first began, done by 8 PM like any outdoor stop the builder adds (half-hour slots from 8 AM).
+var FAVOURITES = { "abel-tasman": ["kaiteriteri-beach"], queenstown: ["queenstown-gardens", "queenstown-bay-beach"] };
+var FAVOURITE_DAY = { from: 4, most: 12 };
+// A spare day in Kaikōura (owner, 2026-11-24: "they would stay in Hanmer between Kaikōura and Christchurch ... otherwise they
+// should spend an extra day in Christchurch not Kaikōura"): a night in Hanmer, or a day in Christchurch (spareDays).
+var SPARE = { town: "kaikoura", night: "hanmer-springs", instead: "christchurch" };
 
 // One point each for a picked vibe, a picked category, a picked activity, and a long walk for big hikers.
 function fitScore(p, ans) {
@@ -405,8 +411,9 @@ function personalise(data, pack, ans, route) {
     // A built day left with fewer than 3 sights is topped up from its end town, then its start town.
     var sights = function () { return items.filter(function (it) { return !foodOnly(places[it.siteId]); }).length; };
     if (route.kind === "built") {
-      var fill = ranked(townPlaces(b.endTown).filter(spare), ans).concat(b.startTown === b.endTown ? [] : ranked(townPlaces(b.startTown).filter(spare), ans))
-        .filter(function (p) { return !foodOnly(p); });
+      // (the morning after a night in Hanmer is spent there: its places first that day, owner 2026-11-24 "they would stay in Hanmer")
+      var fillTowns = b.startTown === b.endTown ? [b.endTown] : b.half === 2 ? [b.startTown, b.endTown] : [b.endTown, b.startTown];
+      var fill = [].concat.apply([], fillTowns.map(function (t) { return ranked(townPlaces(t).filter(spare), ans); })).filter(function (p) { return !foodOnly(p); });
       // a thin day may reach a little further off the way (40 km), never a long double back
       while (sights() < 3 && (add(fill, fill.length) || add(fill, fill.length, 40))) {}
       // A day left with no sight (every one it had was seen on an earlier day) takes its own towns' places (owner, 2026-11-24),
@@ -450,18 +457,24 @@ function personalise(data, pack, ans, route) {
         return true;
       });
     }
-    // A day in a beach town left with no sight is a beach day (owner, 2026-11-24): the town's beach, even one the trip has
-    // been to, for the time between the day's stops: from 10 AM at the earliest when it opens the day, to the next stop (less
-    // the drive) or for 6 hours at most, done by 8 PM like any outdoor stop the builder adds; never shorter than its own time.
-    var beach = !sights() && places[BEACH_DAY[b.endTown]];
-    if (beach && add([beach], 1)) {
-      var bk = items.map(function (it) { return it.siteId; }).indexOf(beach.id), sand = items[bk], after = items[bk + 1];
-      var open = bk ? sand.slotIndex : Math.max(sand.slotIndex, BEACH.from);
-      var till = after ? after.slotIndex - pack.getLeg(beach.id, after.siteId, look).slots : addEnd(beach);
-      var long = items.slice();
-      long[bk] = { siteId: sand.siteId, siteName: sand.siteName, slotIndex: open, durationSlots: Math.max(beach.slots, Math.min(till - open, BEACH.most)) };
-      var timed = packDay(pack, look, prevLast, long);
-      if (timed.every(function (it, j) { return it.slotIndex === long[j].slotIndex; }) && fits(pack, look, prevLast, timed)) items = timed;
+    // A day in a town with favourites left with no sight goes back to them (FAVOURITES, owner 2026-11-24): each in the town's
+    // order, the next right after the last; then they move to 10 AM if they open the day, and the last fills the time to the
+    // next stop (less the drive) or to 6 hours after the first began, done by 8 PM. No other stop moves.
+    var favs = !sights() && FAVOURITES[b.endTown];
+    if (favs) {
+      var fk = -1, ids = function () { return items.map(function (it) { return it.siteId; }); };
+      favs.forEach(function (id) { if (add([places[id]], 1, undefined, fk < 0 ? undefined : fk + 1)) fk = ids().indexOf(id); });
+      var on = ids().map(function (id, j) { return favs.indexOf(id) >= 0 ? j : -1; }).filter(function (j) { return j >= 0; });
+      if (on.length) {
+        var long = items.map(function (it) { return { siteId: it.siteId, siteName: it.siteName, slotIndex: it.slotIndex, durationSlots: it.durationSlots }; });
+        if (!on[0]) long[0].slotIndex = Math.max(long[0].slotIndex, FAVOURITE_DAY.from);
+        long = packDay(pack, look, prevLast, long);
+        var fl = on[on.length - 1], lp = places[long[fl].siteId], nx = items[fl + 1];
+        var till = Math.min(nx ? nx.slotIndex - pack.getLeg(lp.id, nx.siteId, look).slots : addEnd(lp), long[on[0]].slotIndex + FAVOURITE_DAY.most);
+        long[fl] = { siteId: lp.id, siteName: long[fl].siteName, slotIndex: long[fl].slotIndex, durationSlots: Math.max(lp.slots, till - long[fl].slotIndex) };
+        var timed = packDay(pack, look, prevLast, long);
+        if (timed.every(function (it, j) { return it.slotIndex === (on.indexOf(j) >= 0 ? long[j] : items[j]).slotIndex; }) && fits(pack, look, prevLast, timed)) items = timed;
+      }
     }
     // The one final check every returned day passes, whatever removed or added its stops: packTrip moves nothing
     // and nothing ends after 10 PM; otherwise drop the last stop and time the day again.
@@ -494,6 +507,46 @@ function personalise(data, pack, ans, route) {
   return { days: days, missing: ans.activities.filter(function (a) { return !has[a]; }) };
 }
 
+// A route's spare days (null) in Kaikōura (SPARE): when the stay there begins or ends with the day between Kaikōura and
+// Christchurch through Hanmer, that day becomes two with the night in Hanmer between them, its stops up to its last one in
+// Hanmer and then the rest; otherwise the spare day moves to the nearest day the trip is in Christchurch, never next to
+// another spare day; else it stays.
+function spareDays(data, ans, blocks) {
+  var look = function (id) { return data.places[id]; }, out = blocks.slice();
+  var townAt = function (p) { for (var k = p - 1; k >= 0; k--) if (out[k]) return out[k].endTown; return ans.start; };
+  var inTown = function (b) { return !b || (b.startTown === SPARE.town && b.endTown === SPARE.town); };
+  var through = function (b) {
+    return !!b && [b.startTown, b.endTown].sort().join() === [SPARE.town, SPARE.instead].sort().join() &&
+      b.items.some(function (it) { return look(it.siteId).area === SPARE.night; });
+  };
+  var split = function (b) {
+    var k = 0;
+    b.items.forEach(function (it, j) { if (look(it.siteId).area === SPARE.night) k = j + 1; });
+    return [[b.startTown, SPARE.night, b.items.slice(0, k)], [SPARE.night, b.endTown, b.items.slice(k)]].map(function (h, j) {
+      return { id: b.id + "|" + SPARE.night + "|" + (j + 1), startTown: h[0], endTown: h[1], items: h[2], half: j + 1 };
+    });
+  };
+  for (var i = 0; i < out.length; i++) {
+    if (out[i] || townAt(i) !== SPARE.town) continue;
+    var a = i - 1, z = i + 1;
+    while (a >= 0 && inTown(out[a])) a--;
+    while (z < out.length && inTown(out[z])) z++;
+    if (a >= 0 && through(out[a])) { out.splice(i, 1); out.splice.apply(out, [a, 1].concat(split(out[a]))); }
+    else if (z < out.length && through(out[z])) { out.splice.apply(out, [z, 1].concat(split(out[z]))); out.splice(i, 1); }
+    else {
+      out.splice(i, 1);
+      var to = -1;
+      for (var p = 0; p <= out.length; p++) {
+        if (townAt(p) === SPARE.instead && !(p && !out[p - 1]) && !(p < out.length && !out[p]) && (to < 0 || Math.abs(p - i) < Math.abs(to - i))) to = p;
+      }
+      out.splice(to < 0 ? i : to, 0, null);
+      if (to < 0) continue; // nowhere in Christchurch: it stays
+    }
+    i = -1; // the days moved: look again from the first
+  }
+  return out;
+}
+
 // buildTrips(data, pack, answers) -> up to three trip options, best first.
 // Suggested trips with the same start and length always come first (over-limit days marked); then the best loop
 // and the best one-way built from the blocks, the one-way only when it scores at least as well as the loop.
@@ -517,10 +570,10 @@ function buildTrips(data, pack, ans) {
   }
   // Every free day of a built route (a last-resort route's too: Dunedin and back in 3 days, review 2026-11-23) is a rest day
   // ("rest-<town>", owner 2026-11-24), spent in the town it is in and filled from the town's places like any town day, or
-  // out to a nearby town and back.
+  // out to a nearby town and back; one in Kaikōura is a night in Hanmer or a day in Christchurch first (spareDays).
   built.forEach(function (r) {
     var at = ans.start;
-    r.blocks = r.blocks.map(function (b) {
+    r.blocks = spareDays(data, ans, r.blocks).map(function (b) {
       if (b) { at = b.endTown; return b; }
       return { id: "rest-" + at, startTown: at, endTown: at, driveMinutes: 0, items: [], rest: true };
     });
@@ -541,4 +594,4 @@ function buildTrips(data, pack, ans) {
   }).filter(Boolean);
 }
 
-if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, BEACH_DAY: BEACH_DAY };
+if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, FAVOURITES: FAVOURITES };

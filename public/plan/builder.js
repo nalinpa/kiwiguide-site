@@ -716,20 +716,53 @@ function drivesMore(q, than, ans) {
 // tried in turn. The trip is filled again (p: personalise's result) and kept only with the cruise in it, no more empty days,
 // and no more driving over the limit.
 function doubtfulDay(data, pack, ans, r, p) {
-  var has = function (q) { return q.days.some(function (d) { return d.items.some(function (it) { return it.siteId === DOUBTFUL.cruise; }); }); };
-  var free = function (q) { return q.days.filter(function (d) { return d.free; }).length; };
-  var day = prepare(data).byId[DOUBTFUL.day], at = -1;
-  r.blocks.forEach(function (b, i) { if (at < 0 && b.endTown === DOUBTFUL.town && b.startTown !== DOUBTFUL.town) at = i + 1; });
-  var spares = r.blocks.map(function (b, i) { return b.rest ? i : -1; }).filter(function (i) { return i >= 0; });
-  if (!day || at < 0 || !spares.length || has(p)) return p;
-  spares.sort(function (x, y) { return Math.abs(x - at) - Math.abs(y - at) || x - y; });
+  var day = prepare(data).byId[DOUBTFUL.day];
+  if (!day) return p;
   var cruise = { id: day.id + "|no-food", startTown: day.startTown, endTown: day.endTown, driveMinutes: day.driveMinutes, items: day.items.filter(function (it) { return !foodOnly(data.places[it.siteId]); }) };
-  for (var s = 0; s < spares.length; s++) {
-    var k = spares[s], blocks = r.blocks.slice();
+  return soundDay(data, pack, ans, r, p, DOUBTFUL.cruise, cruise, function (b) { return b.rest; }, true);
+}
+
+// The owner's Milford day (owner, 2026-11-25: "the Invercargill trips should include Milford sound"; "pick (a) for trips of 7
+// days or more, and (b) for shorter ones"): in a trip that stays in Te Anau without the Milford cruise, the first day there
+// is the Milford day (before Doubtful Sound, which goes second: doubtfulDay runs after), in place of a spare day there, else
+// another day there, Doubtful Sound last. A trip of 7 days or more that only passes through takes a spare day from
+// elsewhere for it (the nearest first), over the spare-day towns (SPARE_TOWNS). Kept only with the cruise in it and no more
+// empty days; more driving over the limit is allowed (owner, 2026-11-24: days over the limit are OK): the Milford road is
+// 3 hours there and back.
+var MILFORD = { day: "miles-better-pies..redcliff-te-anau", cruise: "cruise-milford-small-boat-cruise", pullDays: 7 };
+function milfordDay(data, pack, ans, r, p) {
+  var day = prepare(data).byId[MILFORD.day], town = DOUBTFUL.town;
+  if (!day) return p;
+  var here = function (b) { return b.startTown === town && b.endTown === town; };
+  var rank = function (b) { return b.rest ? 0 : b.items.some(function (it) { return it.siteId === DOUBTFUL.cruise; }) ? 2 : 1; };
+  return soundDay(data, pack, ans, r, p, MILFORD.cruise, day, function (b, i, at) {
+    var stay = at >= 0 && i >= at && r.blocks.slice(at, i + 1).every(here);
+    return stay || (b.rest && ans.days >= MILFORD.pullDays);
+  }, false, function (k, at) { return r.blocks.slice(at, k + 1).every(here) ? rank(r.blocks[k]) : 3; });
+}
+
+// A sound's day (`cruise`, the place id; `day`, the block) the day after the trip first arrives in Te Anau, after any Milford
+// day there, in place of a day `may(block, index, at)` allows: in `order(index, at)` (lowest first), then the nearest. Kept
+// only with the cruise in it, no more empty days, and (`noMoreOver`) no more driving over the limit.
+function soundDay(data, pack, ans, r, p, cruise, day, may, noMoreOver, order) {
+  var has = function (q) { return q.days.some(function (d) { return d.items.some(function (it) { return it.siteId === cruise; }); }); };
+  var free = function (q) { return q.days.filter(function (d) { return d.free; }).length; };
+  // the first time the trip arrives there to stay (a day in Te Anau after), else the first time it arrives
+  var at = -1, here = function (b) { return !!b && b.startTown === DOUBTFUL.town && b.endTown === DOUBTFUL.town; };
+  r.blocks.forEach(function (b, i) { if (b.endTown === DOUBTFUL.town && b.startTown !== DOUBTFUL.town && (at < 0 || (!here(r.blocks[at]) && here(r.blocks[i + 1])))) at = i + 1; });
+  if (at < 0 || has(p)) return p;
+  var to = at;
+  while (to < r.blocks.length && r.blocks[to].items.some(function (it) { return it.siteId === MILFORD.cruise; })) to++;
+  var spots = r.blocks.map(function (b, i) { return may(b, i, at) && b.id !== day.id ? i : -1; }).filter(function (i) { return i >= 0 && (i < at || i >= to); });
+  if (!spots.length) return p;
+  var by = order || function () { return 0; };
+  spots.sort(function (x, y) { return by(x, at) - by(y, at) || Math.abs(x - to) - Math.abs(y - to) || x - y; });
+  for (var s = 0; s < spots.length; s++) {
+    var k = spots[s], blocks = r.blocks.slice();
     blocks.splice(k, 1);
-    blocks.splice(k < at ? at - 1 : at, 0, cruise);
+    blocks.splice(k < to ? to - 1 : to, 0, day);
     var np = personalise(data, pack, ans, { kind: r.kind, end: r.end, blocks: blocks });
-    if (has(np) && free(np) <= free(p) && !drivesMore(np, p, ans)) { r.blocks = blocks; return np; }
+    if (has(np) && free(np) <= free(p) && (!noMoreOver || !drivesMore(np, p, ans))) { r.blocks = blocks; return np; }
   }
   return p;
 }
@@ -856,9 +889,9 @@ function buildTrips(data, pack, ans) {
   return suggested.concat(built).slice(0, 3).map(function (r) {
     var p = personalise(data, pack, ans, r);
     if (r.stay && p.days.some(function (d) { return d.free; })) return null; // the town ran out of places
-    if (r.kind === "built" && !r.stay) p = moveEmpty(data, pack, ans, r, doubtfulDay(data, pack, ans, r, p));
+    if (r.kind === "built" && !r.stay) p = moveEmpty(data, pack, ans, r, doubtfulDay(data, pack, ans, r, milfordDay(data, pack, ans, r, p)));
     return { kind: r.kind, key: r.key, label: r.label, start: ans.start, end: r.end, days: p.days, missing: p.missing };
   }).filter(Boolean);
 }
 
-if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, FAVOURITES: FAVOURITES, START_MORNING: START_MORNING, START_PUSH: START_PUSH, ARRIVE: ARRIVE, AFTERNOON: AFTERNOON, MOVES: MOVES, moveStops: moveStops, SPARE_TOWNS: SPARE_TOWNS, EARLIER: EARLIER, moveEarlier: moveEarlier, dayOut: dayOut, lateOk: lateOk };
+if (typeof module !== "undefined") module.exports = { buildTrips: buildTrips, TOWNS_RANKED: TOWNS_RANKED, townCost: townCost, TOP_UP: TOP_UP, onWay: onWay, townSpot: townSpot, closeUp: closeUp, mayAdd: mayAdd, ONE_DAY: ONE_DAY, nearbyTowns: nearbyTowns, DAY_OUT: DAY_OUT, FAVOURITES: FAVOURITES, START_MORNING: START_MORNING, START_PUSH: START_PUSH, ARRIVE: ARRIVE, AFTERNOON: AFTERNOON, MOVES: MOVES, moveStops: moveStops, SPARE_TOWNS: SPARE_TOWNS, MILFORD: MILFORD, EARLIER: EARLIER, moveEarlier: moveEarlier, dayOut: dayOut, lateOk: lateOk };

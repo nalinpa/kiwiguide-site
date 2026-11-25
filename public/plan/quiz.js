@@ -395,7 +395,10 @@ if (typeof document !== "undefined") (function () {
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* works without it */ } }
 
   var SAVED = "kg-saved";
-  var GOOGLE = "kg-google"; // { state, nonce } while the visitor is at Google; removed on return
+  var GOOGLE = "kg-google"; // { state, nonce, provider } while the visitor is at Google or Apple; removed on return
+  // Continue with Apple only at /plan/?apple=1 until the owner's phone test passes (2026-11-26); then true for everyone
+  var APPLE_ON = false || /[?&]apple=1(&|$)/.test(location.search);
+  var A_MARK = '<svg width="20" height="20" viewBox="0 0 814 1000" aria-hidden="true"><path fill="currentColor" d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-156 124s-86-40-164-40c-77 0-104 41-167 41s-107-58-157-129C43 788 0 671 0 560c0-178 116-272 230-272 61 0 111 40 149 40 37 0 94-42 163-42 26 0 120 2 182 92zM554 175c28-34 49-81 49-128 0-7-1-13-2-19-46 2-101 31-134 70-26 30-50 77-50 124 0 7 1 14 2 16 3 1 8 1 12 1 41 0 93-28 123-64z"/></svg>';
   var G_MARK = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
   // Back from Google: the answer is in the address bar (#id_token=..&state=..). Take it and clear it before anything else.
   // Anything that carries id_token or error is cleared, even if it is malformed or the saved key is corrupt.
@@ -676,7 +679,8 @@ if (typeof document !== "undefined") (function () {
       var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in to save your trip" : "Save your trip";
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
       var dby = ' aria-describedby="q-err"';
-      var google = mode === "forgot" ? "" : '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
+      var google = mode === "forgot" ? "" : (APPLE_ON ? '<button type="button" class="q-apple" data-act="apple">' + A_MARK + "<span>Continue with Apple</span></button>" : "") +
+        '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
       return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + '</p><p class="q-status" id="q-status" role="status"></p>' + google +
         '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
         (mode === "forgot" ? "" : '<label>Password<input id="q-pass" type="password" name="password" autocomplete="' + (mode === "signin" ? "current-password" : "new-password") + '" required' + dby + "></label>") +
@@ -900,6 +904,7 @@ if (typeof document !== "undefined") (function () {
     else if (act === "save") { acct.error = ""; acct.note = ""; go(S.account); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();
+    else if (act === "apple") goApple();
     else if (act === "retry") doSave();
     else if (act === "reload") { load = retryLoad(load); render(); }
     else if (act === "replace") doReplace();
@@ -1001,14 +1006,20 @@ if (typeof document !== "undefined") (function () {
     try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce })); } catch (e) { return setErr(authErrorMessage("")); }
     location.assign(googleAuthUrl(location.origin, state, nonce));
   }
-  // The visitor is back from Google: sign in with its answer, then the same save flow as for email.
+  // Off to Apple, the same way; Apple gets the nonce's hash (Firebase checks it against the nonce itself).
+  function goApple() {
+    var state = newToken(), nonce = newToken();
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple" })); } catch (e) { return setErr(authErrorMessage("")); }
+    sha256Hex(nonce).then(function (h) { location.assign(appleAuthUrl(location.origin, state, h)); }, function () { setErr(authErrorMessage("")); });
+  }
+  // The visitor is back from Google or Apple: sign in with its answer, then the same save flow as for email.
   function finishGoogle() {
-    var net = fetch.bind(window), r = gret, sv = gsaved;
+    var net = fetch.bind(window), r = gret, sv = gsaved, by = sv && sv.provider === "apple" ? "apple" : "google";
     gret = gsaved = null;
-    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with Google…"; // render left it empty, so the change is announced; fail() clears it
+    var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with " + (by === "apple" ? "Apple" : "Google") + "…"; // render left it empty, so the change is announced; fail() clears it
     run(function () {
       return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
-        if (s.isNew) track("sign_up", { method: "google" });
+        if (s.isNew) track("sign_up", { method: by });
         session = s;
         return saveFlow(net, s.idToken, newBody());
       });
@@ -1030,7 +1041,7 @@ if (typeof document !== "undefined") (function () {
 
   // Back from Google (and not already saved): the sign-in finishes once the trip is built again.
   var googlePending = gfrag && !savedInfo();
-  if (googlePending && !st.pick && !(gret && gret.error === "access_denied")) notice = "Your answers were lost on the way back from Google. Pick your trip again.";
+  if (googlePending && !st.pick && !(gret && gret.error === "access_denied")) notice = "Your answers were lost on the way back from " + (gsaved && gsaved.provider === "apple" ? "Apple" : "Google") + ". Pick your trip again.";
   if (st.start) loadData();
   try { render(); } catch (e) {
     root.innerHTML = '<h1>Something went wrong</h1><p>The quiz hit a problem. Reload the page, or <a href="/#trips">see the suggested trips</a>.</p>';

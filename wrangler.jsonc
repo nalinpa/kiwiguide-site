@@ -10,7 +10,7 @@
   "workers_dev": false,
   "preview_urls": true,
   "main": "src/worker.js",
-  "assets": { "directory": "./public", "run_worker_first": ["/go/*"] },
+  "assets": { "directory": "./public", "run_worker_first": ["/go/*", "/plan/apple"] },
   "d1_databases": [
     { "binding": "DB", "database_name": "kiwiguide-clicks", "database_id": "8e919eff-fa80-4560-b848-0d70665a7eaf" }
   ],

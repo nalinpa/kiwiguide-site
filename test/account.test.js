@@ -233,3 +233,30 @@ test("signInWithGoogle: Identity Toolkit's 200 with errorMessage and no idToken 
   }
   await assert.rejects(signInWithGoogle(fake(() => res(200, { errorMessage: "SOMETHING_ELSE" })), "t", "u"), { code: "" });
 });
+
+// ---- Continue with Apple (owner, 2026-11-26) ----
+const SAVED_A = { state: "S1", nonce: "N1", provider: "apple" };
+
+test("appleAuthUrl: the website's Services ID, the worker's return, form_post with the email, the hashed nonce and the state", () => {
+  const u = new URL(A.appleAuthUrl("https://kiwiguide.app", "S1", "H1"));
+  assert.equal(u.origin + u.pathname, "https://appleid.apple.com/auth/authorize");
+  assert.equal(A.APPLE_SERVICES_ID, "app.blacksands.southislandguide.web");
+  assert.deepEqual(Object.fromEntries(u.searchParams), { client_id: A.APPLE_SERVICES_ID, redirect_uri: "https://kiwiguide.app/plan/apple", response_type: "code id_token", scope: "email", response_mode: "form_post", nonce: "H1", state: "S1" });
+});
+
+test("sha256Hex is the hex SHA-256 Apple's token carries", async () => {
+  assert.equal(await A.sha256Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+});
+
+test("Apple's return: the token's nonce must be the saved nonce's hash; Firebase gets apple.com and the nonce itself", async () => {
+  const f = fake(() => res(200, { idToken: "FT", email: "a@privaterelay.appleid.com", isNewUser: true }));
+  // the raw nonce in the token (Google's check) is refused for Apple, with no network call
+  await assert.rejects(completeGoogle(f, { idToken: jwt("N1"), state: "S1" }, SAVED_A, "u"), { code: "" });
+  assert.equal(f.calls.length, 0);
+  const s = await completeGoogle(f, { idToken: jwt(await A.sha256Hex("N1")), state: "S1" }, SAVED_A, "https://kiwiguide.app/plan/");
+  assert.deepEqual(s, { idToken: "FT", email: "a@privaterelay.appleid.com", isNew: true });
+  const tok = jwt(await A.sha256Hex("N1"));
+  assert.deepEqual(JSON.parse(f.calls[0].opts.body), { postBody: "id_token=" + tok + "&providerId=apple.com&nonce=N1", requestUri: "https://kiwiguide.app/plan/", returnSecureToken: true, returnIdpCredential: true });
+  // cancelled at Apple (the worker passes it on as access_denied): the cancel code, no message
+  await assert.rejects(completeGoogle(f, { error: "access_denied", state: "S1" }, SAVED_A, "u"), { code: "GOOGLE_CANCELLED" });
+});

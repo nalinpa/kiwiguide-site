@@ -1,9 +1,11 @@
-// Runs only for /go/* (run_worker_first in wrangler.jsonc); everything else is served from public/.
+// Runs only for /go/* and /plan/apple (run_worker_first in wrangler.jsonc); everything else is served from public/.
 import campaigns from "./campaigns.js";
 import { normaliseName, resolve, device, isBot, referrerHost } from "./links.js";
+import { appleReturn } from "./apple.js";
 
 export default {
   async fetch(request, env, ctx) {
+    if (new URL(request.url).pathname === "/plan/apple") return appleReturn(request);
     const name = normaliseName(new URL(request.url).pathname.slice("/go/".length));
     const { url, known } = resolve(name, campaigns, request.url);
     // Logging must never slow or break the redirect: run it after responding and drop any error.

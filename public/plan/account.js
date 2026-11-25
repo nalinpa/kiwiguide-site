@@ -89,11 +89,30 @@ function jwtNonce(t) {
   try { return JSON.parse(atob(String(t).split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).nonce; } catch (e) { return undefined; }
 }
 
-function signInWithGoogle(fetchFn, googleIdToken, requestUri) {
+// ---- Continue with Apple: Apple posts its answer to the worker (/plan/apple, response_mode form_post, needed for the
+// email), which sends it on to /plan/ in the same fragment shape as Google's. Apple gets the nonce's SHA-256, Firebase the
+// nonce itself.
+var APPLE_SERVICES_ID = "app.blacksands.southislandguide.web"; // the website's Services ID (owner, Apple Developer)
+
+function appleAuthUrl(origin, state, hashedNonce) {
+  var q = { client_id: APPLE_SERVICES_ID, redirect_uri: origin + "/plan/apple", response_type: "code id_token", scope: "email", response_mode: "form_post", nonce: hashedNonce, state: state };
+  return "https://appleid.apple.com/auth/authorize?" + Object.keys(q).map(function (k) { return k + "=" + encodeURIComponent(q[k]); }).join("&");
+}
+
+function sha256Hex(text) {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function (buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return (b < 16 ? "0" : "") + b.toString(16); }).join("");
+  });
+}
+
+function signInWithGoogle(fetchFn, googleIdToken, requestUri) { return signInWithIdp(fetchFn, "id_token=" + googleIdToken + "&providerId=google.com", requestUri); }
+function signInWithApple(fetchFn, appleIdToken, rawNonce, requestUri) { return signInWithIdp(fetchFn, "id_token=" + appleIdToken + "&providerId=apple.com&nonce=" + encodeURIComponent(rawNonce), requestUri); }
+
+function signInWithIdp(fetchFn, postBody, requestUri) {
   return fetchFn(IDT + "signInWithIdp?key=" + encodeURIComponent(FIREBASE_WEB_KEY), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ postBody: "id_token=" + googleIdToken + "&providerId=google.com", requestUri: requestUri, returnSecureToken: true, returnIdpCredential: true }),
+    body: JSON.stringify({ postBody: postBody, requestUri: requestUri, returnSecureToken: true, returnIdpCredential: true }),
   }).then(function (r) {
     return r.json().then(function (data) {
       if (!r.ok) throw { code: String((data && data.error && data.error.message) || "") };
@@ -107,10 +126,18 @@ function signInWithGoogle(fetchFn, googleIdToken, requestUri) {
 }
 
 // The state is checked first (and the nonce inside the token); nothing goes to the network unless both match what the page saved before leaving.
+// Google's or Apple's (saved.provider "apple") return: both come back in the same fragment shape.
 function completeGoogle(fetchFn, ret, saved, requestUri) {
   if (!ret || !saved || !saved.state || ret.state !== saved.state) return Promise.reject({ code: "" });
   if (ret.error) return Promise.reject({ code: ret.error === "access_denied" ? "GOOGLE_CANCELLED" : "" });
-  if (!saved.nonce || jwtNonce(ret.idToken) !== saved.nonce) return Promise.reject({ code: "" });
+  if (!saved.nonce) return Promise.reject({ code: "" });
+  if (saved.provider === "apple") {
+    return sha256Hex(saved.nonce).then(function (h) {
+      if (jwtNonce(ret.idToken) !== h) throw { code: "" };
+      return signInWithApple(fetchFn, ret.idToken, saved.nonce, requestUri);
+    });
+  }
+  if (jwtNonce(ret.idToken) !== saved.nonce) return Promise.reject({ code: "" });
   return signInWithGoogle(fetchFn, ret.idToken, requestUri);
 }
 
@@ -203,4 +230,4 @@ function saveErrorMessage(status, error) {
   return "The trip could not be saved. Your account is kept. Try again.";
 }
 
-if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, GOOGLE_WEB_CLIENT_ID: GOOGLE_WEB_CLIENT_ID, googleAuthUrl: googleAuthUrl, newToken: newToken, readGoogleReturn: readGoogleReturn, signInWithGoogle: signInWithGoogle, completeGoogle: completeGoogle, createAccount: createAccount, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };
+if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, GOOGLE_WEB_CLIENT_ID: GOOGLE_WEB_CLIENT_ID, googleAuthUrl: googleAuthUrl, newToken: newToken, readGoogleReturn: readGoogleReturn, signInWithGoogle: signInWithGoogle, completeGoogle: completeGoogle, APPLE_SERVICES_ID: APPLE_SERVICES_ID, appleAuthUrl: appleAuthUrl, sha256Hex: sha256Hex, signInWithApple: signInWithApple, createAccount: createAccount, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };

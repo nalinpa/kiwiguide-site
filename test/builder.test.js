@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 const require = createRequire(import.meta.url);
-const { buildTrips, TOWNS_RANKED, townCost, TOP_UP, onWay, townSpot, closeUp, mayAdd, ONE_DAY, nearbyTowns, DAY_OUT, FAVOURITES, START_MORNING, START_PUSH, ARRIVE, AFTERNOON, MOVES, moveStops, SPARE_TOWNS, EARLIER, moveEarlier, dayOut } = require("../public/plan/builder.js");
+const { buildTrips, TOWNS_RANKED, townCost, TOP_UP, onWay, townSpot, closeUp, mayAdd, ONE_DAY, nearbyTowns, DAY_OUT, FAVOURITES, START_MORNING, START_PUSH, ARRIVE, AFTERNOON, MOVES, moveStops, SPARE_TOWNS, EARLIER, moveEarlier, dayOut, lateOk } = require("../public/plan/builder.js");
 // A place's opening hours as the export gives them (half-hour slots from 8 AM, null when the app has none): the first
 // half-hour it is open, and its close (owner, 2026-11-25: "carry from app")
 const opensT = (p) => (p.open == null ? -Infinity : Math.ceil(p.open)), closesT = (p) => (p.close == null ? Infinity : p.close);
@@ -246,11 +246,20 @@ test("easy drops only a non-featured walk, never a day's only walk, only past th
 
 // Could some place in the day's end or start town, not in the trip or its blocks and not Food-only, still go in?
 // Same rules as the builder: after a stop in its own area (first: the day's first stop is in its area, or it's in
-// the start town; with arrive: also where the day has arrived in its end town), nothing else moves, it ends by 6 PM (8 PM if
-// outdoors only), the day is a packTrip fixed point, and it is on the way (a thin day's 40 km) from the stop before it, or
+// the start town; with arrive: also where the day has arrived in its end town), nothing else moves, it starts once its place
+// is open and ends by 6 PM (8 PM if it may run late) and by its close,
+// the day is a packTrip fixed point, and it is on the way (a thin day's 40 km) from the stop before it, or
 // where yesterday ended (before day 1: the start town's hub), to the stop after it, or where the day leads (tomorrow's first
 // stop that stays: food off drops a café); on a rest day (rest) the traveller stays based in town, so no direction.
-const OUTDOORS = ["Walks", "Scenic", "Nature", "Water"];
+// What may run past 6 PM (owner, 2026-11-25: "doing bridle path at 6 makes no sense"; "only things that could go after 6 are
+// restaurants, lookouts and west coast beaches"): somewhere to eat, a half-hour stop named a lookout, a West Coast beach
+// that isn't a walk.
+const WEST_COAST_T = ["westport", "punakaiki", "greymouth", "hokitika", "franz-josef", "fox-glacier", "haast"];
+const lateOkT = (p) => p.category.includes("Food") || (/lookout/i.test(p.name) && p.slots <= 1) || (WEST_COAST_T.includes(p.area) && /\b(beach|bay)\b/i.test(p.name) && !p.category.includes("Walks"));
+// (Lots of walking keeps the old end for now, any outdoor stop to 8 PM: "leave out lots of walking for now", owner 2026-11-25)
+const OUTDOORS_T = ["Walks", "Scenic", "Nature", "Water"];
+const addEndT = (p, pace) => ((pace === "hikes" ? p.category.every((c) => OUTDOORS_T.includes(c)) : lateOkT(p)) ? 24 : 20);
+const endByT = (p, pace) => Math.min(addEndT(p, pace), closesT(p));
 // Where the traveller is before day i: the last stop of the nearest earlier day with stops, else the start town's hub (owner,
 // 2026-11-24: day 1 is timed from where the trip starts)
 const fromBefore = (o, i) => o.days.slice(0, i).reverse().find((x) => x.items.length)?.items.at(-1) || { siteId: pack.hubs[o.start], slotIndex: 0, durationSlots: 1 };
@@ -270,11 +279,10 @@ function someCandidateFits(o, i, opts = {}) {
     if (after && data.places[after.siteId].area !== p.area && !(pos === 0 && p.area === b.startTown) && !arrived) continue;
     if (!onWayT(pos ? data.places[items[pos - 1].siteId] : data.places[prevDay.items[0].siteId], p, pos < items.length ? data.places[items[pos].siteId] : opts.rest ? null : ahead, 40)) continue;
     const trial = items.slice();
-    trial.splice(pos, 0, { siteId: p.id, siteName: p.name, slotIndex: pos ? after.slotIndex + after.durationSlots : 0, durationSlots: p.slots });
+    trial.splice(pos, 0, { siteId: p.id, siteName: p.name, slotIndex: Math.max(pos ? after.slotIndex + after.durationSlots : 0, opensT(p)), durationSlots: p.slots });
     const out = pack.packTrip([prevDay, { items: trial }], lookup)[1].items;
     if (!out.every((it, k) => k === pos || it.slotIndex === trial[k].slotIndex)) continue;
-    const end = p.category.every((c) => OUTDOORS.includes(c)) ? 24 : 20;
-    if (out[pos].slotIndex + p.slots > end) continue;
+    if (out[pos].slotIndex + p.slots > endByT(p, opts.pace)) continue;
     const again = pack.packTrip([prevDay, { items: out }], lookup)[1].items;
     if (again.every((it, k) => it.slotIndex === out[k].slotIndex && it.slotIndex + it.durationSlots <= 28)) return p.id;
   }
@@ -285,7 +293,7 @@ test("built days have at least 2 non-Food stops unless nothing more fits", () =>
   for (const { answers, options } of sweep) for (const o of options) if (o.kind === "built") o.days.forEach((d, i) => {
     if (d.free) return;
     const sights = d.items.filter((it) => !foodOnly(data.places[it.siteId])).length;
-    if (sights < 2) assert.equal(someCandidateFits(o, i, { food: answers.food }), null, `${name(answers)} ${o.key} day ${i + 1} has ${sights}`);
+    if (sights < 2) assert.equal(someCandidateFits(o, i, { food: answers.food, pace: answers.pace }), null, `${name(answers)} ${o.key} day ${i + 1} has ${sights}`);
   });
 });
 
@@ -610,10 +618,9 @@ test("a hole before a meal takes a nearby place when one fits (owner, 2026-11-23
   // A meal is held near its time, so stops taken out before it can leave two idle hours or more. The rule, written again
   // here: a place in the town of the stop before the hole or in the meal's own town, not food, a long walk only for Lots of
   // walking, not in the trip or its days' blocks, on the way from that stop to the meal (a thin day's 40 km reach at most),
-  // timed straight after that stop (or from when it opens) without moving any other stop, done by 6 PM (8 PM outdoors) and
-  // by its close. Where such a place exists, the hole must not be left.
+  // timed straight after that stop (or from when it opens) without moving any other stop, done by 6 PM and by its close.
+  // Where such a place exists, the hole must not be left.
   const longWalkT = (p) => p.category.includes("Walks") && p.slots >= 4;
-  const endT = (p) => (p.category.every((c) => ["Walks", "Scenic", "Nature", "Water"].includes(c)) ? 24 : 20);
   const idleT = (a, c) => c.slotIndex - (a.slotIndex + a.durationSlots) - pack.getLeg(a.siteId, c.siteId, lookup).slots;
   let holes = 0, meals = 0; const open = [], foodFirst = [];
   for (const { answers, options } of sweep) for (const o of options) {
@@ -635,7 +642,7 @@ test("a hole before a meal takes a nearby place when one fits (owner, 2026-11-23
           const trial = d.items.map((it) => ({ siteId: it.siteId, siteName: it.siteName, slotIndex: it.slotIndex, durationSlots: it.durationSlots }));
           trial.splice(i, 0, { siteId: p.id, siteName: p.name, slotIndex: Math.max(a.slotIndex + a.durationSlots, opensT(p)), durationSlots: p.slots });
           const out = pack.packTrip([{ items: prevLast ? [prevLast] : [] }, { items: trial }], lookup)[1].items;
-          return out.every((it, k) => k === i || it.slotIndex === trial[k].slotIndex) && out[i].slotIndex + p.slots <= Math.min(endT(p), closesT(p));
+          return out.every((it, k) => k === i || it.slotIndex === trial[k].slotIndex) && out[i].slotIndex + p.slots <= endByT(p, answers.pace);
         });
         if (fit) open.push(name(answers) + " " + o.key + " " + d.block + ": " + idleT(a, m) * 30 + " min before " + m.siteId + " could take " + fit.id);
       });
@@ -692,8 +699,8 @@ test("a place open one day a week is never added (owner, 2026-11-23: Motueka Sun
 
 // Could the rest day d (free) go out to a nearby town and back? The builder's rule written again: an earlier day has stops; a
 // nearby town the trip doesn't otherwise go to; one of its places (not in the trip or its blocks, not food, a long walk only
-// for Lots of walking) and then one of the home town's, each ending by 6 PM (8 PM outdoors), the day a packTrip fixed point by
-// 10 PM, its driving within the limit.
+// for Lots of walking) and then one of the home town's, each from when it opens and ending by 6 PM and its close, the day a
+// packTrip fixed point by 10 PM, its driving within the limit.
 function dayOutFits(o, i, answers) {
   const d = o.days[i], prev = o.days.slice(0, i).reverse().find((x) => x.items.length);
   if (!prev) return null;
@@ -701,12 +708,11 @@ function dayOutFits(o, i, answers) {
   const taken = new Set(o.days.flatMap((x) => x.items.map((it) => it.siteId).concat(blockOf(x) ? blockOf(x).items.map((it) => it.siteId) : [])));
   const went = new Set(o.days.flatMap((x, k) => (k === i ? [] : [...(blockOf(x) ? [blockOf(x).startTown, blockOf(x).endTown, ...blockOf(x).items.map((it) => data.places[it.siteId].area)] : []), ...x.items.map((it) => data.places[it.siteId].area)])));
   const free = (t) => data.towns[t].placeIds.map((id) => data.places[id]).filter((p) => !taken.has(p.id) && mayAdd(p, answers) && !ONE_DAY.includes(p.id));
-  const endBy = (p) => (p.category.every((c) => OUTDOORS.includes(c)) ? 24 : 20);
   for (const n of nearbyTowns(data, pack, d.town)) {
     if (went.has(n)) continue;
     for (const p of free(n)) for (const e of free(d.town)) {
-      const out = pack.packTrip([{ items: [from] }, { items: [{ siteId: p.id, siteName: p.name, slotIndex: 0, durationSlots: p.slots }, { siteId: e.id, siteName: e.name, slotIndex: 0, durationSlots: e.slots }] }], lookup)[1].items;
-      if (out[0].slotIndex + p.slots > endBy(p) || out[1].slotIndex + e.slots > endBy(e) || out[1].slotIndex + e.slots > 28) continue;
+      const out = pack.packTrip([{ items: [from] }, { items: [{ siteId: p.id, siteName: p.name, slotIndex: Math.max(0, opensT(p)), durationSlots: p.slots }, { siteId: e.id, siteName: e.name, slotIndex: Math.max(0, opensT(e)), durationSlots: e.slots }] }], lookup)[1].items;
+      if (out[0].slotIndex + p.slots > endByT(p, answers.pace) || out[1].slotIndex + e.slots > endByT(e, answers.pace) || out[1].slotIndex + e.slots > 28) continue;
       let at = from.siteId, mins = 0;
       for (const it of out) { const leg = pack.getLeg(at, it.siteId, lookup); if (leg.drive) mins += leg.slots * 30; at = it.siteId; }
       if (mins <= answers.drive) return n + ": " + p.id + " then " + e.id;
@@ -731,7 +737,7 @@ test("rest days: a free day of a trip is spent in its town, or out to a nearby t
     if (d.free) {
       free++;
       // left free only when nothing of the town fits and no day out does
-      assert.equal(someCandidateFits(o, i, { food: answers.food, rest: true }), null, why);
+      assert.equal(someCandidateFits(o, i, { food: answers.food, rest: true, pace: answers.pace }), null, why);
       assert.equal(dayOutFits(o, i, answers), null, why);
       return;
     }
@@ -744,11 +750,14 @@ test("rest days: a free day of a trip is spent in its town, or out to a nearby t
     towns[d.town + " > " + n] = (towns[d.town + " > " + n] || 0) + 1;
     assert.equal(others.length, 1, why + ": one town out");
     assert.ok(nearbyTowns(data, pack, d.town).includes(n), why + ": " + n + " is not near " + d.town);
-    assert.ok(d.items.slice(0, -1).every((it) => area(it) === n) && area(d.items[d.items.length - 1]) === d.town, why + ": out, then home");
+    // (home early, the empty afternoon may then take more of the home town: Arrowtown in the morning, then the Frankton Track,
+    // the gardens and the lakefront, since stops end by 6 PM, 2026-11-25)
+    const back = d.items.findIndex((it) => area(it) === d.town);
+    assert.ok(back >= 1 && d.items.slice(0, back).every((it) => area(it) === n) && d.items.slice(back).every((it) => area(it) === d.town), why + ": out, then home");
     // within 90 minutes each way of the town (over the visitor's driving limit too, as any day may be: owner, 2026-11-24)
     const hub = data.places[pack.hubs[d.town]] && pack.hubs[d.town];
-    if (hub) assert.ok(d.items.slice(0, -1).every((it) => { const l = pack.getLeg(hub, it.siteId, lookup); return !l.drive || l.slots <= DAY_OUT.slots; }), why + ": within reach");
-    assert.ok(sightsOf(d) >= 2 && sightsOf(d) <= TOP_UP[answers.pace], why + ": " + sightsOf(d) + " sights");
+    if (hub) assert.ok(d.items.slice(0, back).every((it) => { const l = pack.getLeg(hub, it.siteId, lookup); return !l.drive || l.slots <= DAY_OUT.slots; }), why + ": within reach");
+    assert.ok(back + 1 >= 2 && back + 1 <= TOP_UP[answers.pace], why + ": " + (back + 1) + " sights out and back");
     assert.ok(o.days.slice(0, i).some((x) => x.items.length), why + ": an earlier day has stops");
     o.days.forEach((x, k) => {
       if (k === i) return;
@@ -775,10 +784,11 @@ test("a day out only when the town alone gives the rest day fewer than 3 sights,
   }
   // and one from outside the sweep: Christchurch and back in 14 days at 2 hours a day, Easy, food on, spends its rest day in
   // Wānaka (day 7) out in Queenstown, the owner's first town (an hour each way: over the limit, as any day may be since
-  // 2026-11-24), back to Wānaka for the evening
+  // 2026-11-24), back for the evening at the Cardrona Hotel, 6:30 to 7:30 (somewhere to eat may run past 6 PM, 2026-11-25)
   const more = { start: "christchurch", end: "christchurch", days: 14, drive: 120, pace: "easy", food: true, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] };
   const m = buildTrips(data, pack, more).find((x) => x.key === "built-christchurch-14-loop");
-  assert.deepEqual([m.days[6].block, m.days[6].items.map((it) => data.places[it.siteId].area)], ["rest-wanaka", ["queenstown", "queenstown", "wanaka"]]);
+  assert.deepEqual([m.days[6].block, m.days[6].items.map((it) => data.places[it.siteId].area)], ["rest-wanaka", ["queenstown", "queenstown", "queenstown", "wanaka"]]);
+  assert.deepEqual([m.days[6].items.at(-1).siteId, m.days[6].items.at(-1).slotIndex], ["cardrona-hotel", 21]);
   outs.push({ answers: more, o: m, i: 6 });
   assert.ok(outs.length >= 2, outs.length + " days out");
   const sightsOf = (d) => d.items.filter((it) => !foodOnly(data.places[it.siteId])).length;
@@ -804,12 +814,13 @@ test("a day out only when the town alone gives the rest day fewer than 3 sights,
 
 test("a day after a rest day is timed again from where the rest day ends, not cut (owner, 2026-11-24)", () => {
   // Picton and back in 4 days at 2 hours a day, Easy, food off, adventure: day 3 is a rest day in Kaikōura, filled after day 4
-  // (rest days are filled last) and ending at Cathedral Cliffs, Gore Bay; day 4 is timed again from there and keeps its three
-  // stops (the wine tour by bike it also had, hired 10 to 4, has no time left before it shuts: opening hours, 2026-11-25)
+  // (rest days are filled last) and ending at Cathedral Cliffs, Gore Bay; day 4 is timed again from there and keeps its two
+  // stops (the wine tour by bike it also had, hired 10 to 4, has no time left before it shuts: opening hours, 2026-11-25;
+  // nor has the 5-hour Motuara cruise before 6 PM)
   const o = buildTrips(data, pack, { start: "picton", end: "picton", days: 4, drive: 120, pace: "easy", food: false, vibes: ["adventure"], into: ["Adventure", "Water"], activities: ["stargazing", "wildlife"] }).find((x) => x.key === "built-picton-4-loop");
   assert.equal(o.days[2].block, "rest-kaikoura");
   assert.equal(o.days[2].items.at(-1).siteId, "cathedral-cliffs-gore-bay");
-  assert.deepEqual(o.days[3].items.map((it) => it.siteId), ["monkey-bay-walk-rarangi", "omaka-aviation-heritage-centre", "motuara-island-bird-sanctuary-cruise"]);
+  assert.deepEqual(o.days[3].items.map((it) => it.siteId), ["monkey-bay-walk-rarangi", "omaka-aviation-heritage-centre"]);
   const out = pack.packTrip(o.days.map((d, i) => ({ id: "d" + i, items: d.items.map((it) => ({ ...it, id: it.siteId })) })), lookup);
   out.forEach((d, i) => d.items.forEach((it, k) => assert.equal(it.slotIndex, o.days[i].items[k].slotIndex, "day " + (i + 1))));
 });
@@ -909,7 +920,7 @@ test("only a food-only day and a day that ends before its town place a stop wher
   assert.match(bsrc, /\n      if \(!sights\(\)\) while \(sights\(\) < 3 && \(add\(fill, fill\.length\) \|\| add\(fill, fill\.length, 40\) \|\| add\(fill, fill\.length, undefined, undefined, true\) \|\| add\(fill, fill\.length, 40, undefined, true\)\)\) \{\}\n/);
   assert.match(bsrc, /\n      while \(\(endsShort\(\) \|\| sights\(\) < 3\) && add\(central, central\.length, undefined, items\.length, true, mid\)\) \{\}\n/);
   assert.equal((bsrc.match(/add\([^()]*, true(, mid)?\)/g) || []).length, 3, "arrive is passed by the food-only fill and the arrival only");
-  assert.match(bsrc, /townSpot\(data, pack, b\.startTown\), at, arrive \? b\.endTown : null\);/);
+  assert.match(bsrc, /townSpot\(data, pack, b\.startTown\), at, arrive \? b\.endTown : null, ans\.pace\);/);
   assert.match(bsrc, /\|\| \(!!arrive && p\.area === arrive && items\.slice\(pos\)\.every\(function \(it\) \{ return look\(it\.siteId\)\.area === arrive; \}\)\);/);
 });
 
@@ -920,7 +931,7 @@ test("food-only days: a day left with no sight takes its own towns' places, also
     days++;
     if (d.items.some((it) => !foodOnly(data.places[it.siteId]))) return;
     n++;
-    assert.equal(someCandidateFits(o, i, { food: answers.food, arrive: true }), null, name(answers) + " " + o.key + " day " + (i + 1));
+    assert.equal(someCandidateFits(o, i, { food: answers.food, arrive: true, pace: answers.pace }), null, name(answers) + " " + o.key + " day " + (i + 1));
   });
   console.log(`food-only days: ${n} of ${days}`);
 });
@@ -943,13 +954,15 @@ test("favourite days: a day left with no sight goes back to its town's favourite
     assert.deepEqual(at.map((k) => d.items[k].siteId), favs(d).filter((id) => d.items.some((it) => it.siteId === id)), why);
     assert.deepEqual(at, at.map((_, j) => at[0] + j), why + ": one after another");
     // from 10 AM at the earliest when they open the day; each its own time, but the last fills the time to the next stop (less
-    // the drive) or to 6 hours after the first began, done by 8 PM (an outdoor stop the builder adds)
+    // the drive) or to 6 hours after the first began, done by 6 PM (as most stops the builder adds, owner 2026-11-25; 8 PM for
+    // Lots of walking, left as it was for now)
+    const lim = answers.pace === "hikes" ? 24 : 20;
     const first = d.items[at[0]], last = d.items[at.at(-1)], next = d.items[at.at(-1) + 1];
     if (at[0] === 0) assert.ok(first.slotIndex >= 4, why + ": opens before 10 AM");
     at.slice(0, -1).forEach((k) => assert.equal(d.items[k].durationSlots, data.places[d.items[k].siteId].slots, why));
-    const to = Math.min(next ? next.slotIndex - pack.getLeg(last.siteId, next.siteId, lookup).slots : 24, first.slotIndex + 12);
+    const to = Math.min(next ? next.slotIndex - pack.getLeg(last.siteId, next.siteId, lookup).slots : lim, first.slotIndex + 12);
     assert.equal(last.durationSlots, Math.max(data.places[last.siteId].slots, to - last.slotIndex), why);
-    assert.ok(last.slotIndex + last.durationSlots <= 24, why + ": past 8 PM");
+    assert.ok(last.slotIndex + last.durationSlots <= lim, why + ": past " + (lim === 24 ? 8 : 6) + " PM");
   });
   console.log(`days in towns with favourites: ${JSON.stringify(seen)}; favourite days: ${JSON.stringify(count)}, at a favourite the trip has been to: ${JSON.stringify(again)}`);
   // (Queenstown's: no trip here leaves a Queenstown day with no sight since the website-only days, 2026-11-24; Abel Tasman's
@@ -979,8 +992,9 @@ test("the owner's 3 days from Christchurch, food off: the gardens and the river 
   // (it was the Art Gallery, which shuts at 5: opening hours, 2026-11-25)
   assert.deepEqual(ids(o.days[1]), ["church-of-the-good-shepherd", "DXWpQTSPRQQKPt7SIcVi", "punting-on-the-avon"]);
   for (const id of ids(o.days[1]).slice(1)) assert.ok(data.places[id].area === "christchurch" && kmT(townSpot(data, pack, "christchurch"), data.places[id]) <= ARRIVE.km, id);
-  // the owner's three, then (no drive in now, so the day has room) the town day's place that fits the answers: Bridle Path
-  assert.deepEqual(ids(o.days[2]), ["christchurch-gondola", "taylors-mistake-track", "he-puna-taimoana-hot-pools", "bridle-path"]);
+  // the owner's three (Bridle Path, the town day's place that fits the answers, would run 5:30 to 7:30: "doing bridle path
+  // at 6 makes no sense", 2026-11-25)
+  assert.deepEqual(ids(o.days[2]), ["christchurch-gondola", "taylors-mistake-track", "he-puna-taimoana-hot-pools"]);
   // every night in the day's town; day 1's drive out after the morning in Christchurch
   o.days.forEach((d, i) => assert.equal(data.places[d.items.at(-1).siteId].area, d.town, "day " + (i + 1)));
   assert.ok(o.days[0].items[2].slotIndex >= o.days[0].items[1].slotIndex + o.days[0].items[1].durationSlots + pack.getLeg("avon-river-walk", "mt-john-summit-astro-cafe", lookup).slots);
@@ -1064,7 +1078,7 @@ test("an empty afternoon takes more in the day's town: Queenstown's gardens then
 
 // Same rules as the builder's afternoon (AFTERNOON): after a day's last stop, in its town, one of the town's favourites (not
 // in the day, nor the day before) or a place not in the trip that the builder may add, on the way to the town's middle,
-// nothing else moving, ending by 6 PM (8 PM outdoors), the day a packTrip fixed point.
+// nothing else moving, ending by 6 PM and inside its hours, the day a packTrip fixed point.
 function afternoonFits(o, i, answers) {
   const d = o.days[i], last = d.items.at(-1), prevDay = { items: [fromBefore(o, i)] };
   const taken = new Set(o.days.flatMap((x) => x.items.map((it) => it.siteId).concat(x.block ? (blockOf(x) || { items: [] }).items.map((it) => it.siteId) : [])));
@@ -1076,7 +1090,7 @@ function afternoonFits(o, i, answers) {
     const trial = d.items.concat([{ siteId: id, siteName: p.name, slotIndex: Math.max(last.slotIndex + last.durationSlots, opensT(p)), durationSlots: p.slots }]);
     const out = pack.packTrip([prevDay, { items: trial }], lookup)[1].items;
     if (!out.every((it, k) => k === trial.length - 1 || it.slotIndex === trial[k].slotIndex)) continue;
-    if (out.at(-1).slotIndex + p.slots > Math.min(p.category.every((c) => OUTDOORS.includes(c)) ? 24 : 20, closesT(p))) continue; // and inside its hours
+    if (out.at(-1).slotIndex + p.slots > endByT(p, answers.pace)) continue; // by 6 PM (8 PM if it may run late), and inside its hours
     const again = pack.packTrip([prevDay, { items: out }], lookup)[1].items;
     if (again.every((it, k) => it.slotIndex === out[k].slotIndex && it.slotIndex + it.durationSlots <= 28)) return id;
   }
@@ -1116,7 +1130,9 @@ test("the owner's answers, 2026-11-24: Riverside Markets late, Ōhau Point on da
   }
   // a rest day in Te Anau its town can't fill goes up the Milford road (within 90 minutes each way), over the driving limit if
   // need be: Invercargill and back in 4 days at 2 hours a day, Easy, food off: day 3 is Mirror Lakes and Lake Gunn, then back
-  const iv = buildTrips(data, pack, { start: "invercargill", end: "invercargill", days: 4, drive: 120, pace: "easy", food: false, ...none }).find((x) => x.kind === "built");
+  // for the Glowworm Caves. (With no interests picked the day stays in town since stops end by 6 PM, 2026-11-25: day 2 then
+  // takes the bird sanctuary, not the Kepler walk at 4:30, and no Te Anau place is left to come back to.)
+  const iv = buildTrips(data, pack, { start: "invercargill", end: "invercargill", days: 4, drive: 120, pace: "easy", food: false, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }).find((x) => x.kind === "built");
   assert.equal(iv.days[2].block, "rest-te-anau");
   assert.ok(ids(iv.days[2]).filter((id) => data.places[id].area === "milford-sound").length >= 2, ids(iv.days[2]).join(", "));
   assert.equal(data.places[iv.days[2].items.at(-1).siteId].area, "te-anau");
@@ -1126,10 +1142,13 @@ test("the owner's answers, 2026-11-24: Riverside Markets late, Ōhau Point on da
   const fox = cq.days.find((d) => d.town === "fox-glacier"), lw = data.places[fox.items.at(-1).siteId];
   assert.ok(lw.category.includes("Walks") && lw.slots >= 4 && lw.area === "fox-glacier", fox.items.map((it) => it.siteId).join(", "));
   assert.equal(fox.items.filter((it) => { const p = data.places[it.siteId]; return p.category.includes("Walks") && p.slots >= 4; }).length, 1, "one");
-  // Picton and back in 4 days at 4 hours a day: the last day (Golden Bay to Picton by the Sounds road, its Cullen Point lookout
-  // had on day 1) still reaches Picton: Edwin Fox after the drive over
-  const pp = buildTrips(data, pack, { start: "picton", end: "picton", days: 4, drive: 240, pace: "some", food: false, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }).find((x) => x.kind === "built");
-  assert.equal(data.places[pp.days[3].items.at(-1).siteId].area, "picton", ids(pp.days[3]).join(", "));
+  // Picton and back in 4 days at 4 hours a day, Lots of walking: the last day (Golden Bay to Picton by the Sounds road, its
+  // Cullen Point lookout had on day 1) still reaches Picton: the Snout Track after the drive over. (With Easy or Some walking
+  // it was Edwin Fox, free once day 1 took Rabbit Island to 7:30 PM in its place; stops end by 6 PM now, 2026-11-25, so day 1
+  // keeps Edwin Fox, no Picton place is left, and the last day ends in Nelson with the drive in: 24 of 292 such trips reached
+  // Picton before, none now.)
+  const pp = buildTrips(data, pack, { start: "picton", end: "picton", days: 4, drive: 240, pace: "hikes", food: false, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }).find((x) => x.kind === "built");
+  assert.deepEqual([data.places[pp.days[3].items.at(-1).siteId].area, pp.days[3].items.at(-1).siteId], ["picton", "snout-track-picton"], ids(pp.days[3]).join(", "));
 });
 
 test("spare days in Dunedin, Christchurch, Nelson, Queenstown or Wānaka if possible (owner, 2026-11-25)", () => {
@@ -1167,7 +1186,7 @@ test("a main attraction's swap never takes out a travel day's only stop in the t
 
 // Same rules as the builder's arrival (ARRIVE): a place in the day's end town within ARRIVE.km of its middle, not in the
 // trip, that the builder may add, after the day's last stop, on the way from it to the town's middle (the night is there
-// whichever way the trip goes on), nothing else moving, ending by 6 PM (8 PM outdoors), the day a packTrip fixed point.
+// whichever way the trip goes on), nothing else moving, ending by 6 PM and inside its hours, the day a packTrip fixed point.
 function arrivalFits(o, i, answers) {
   const d = o.days[i], b = blockOf(d), last = d.items.at(-1) || fromBefore(o, i), prevDay = { items: [fromBefore(o, i)] };
   const taken = new Set(o.days.flatMap((x) => x.items.map((it) => it.siteId).concat(x.block ? blockOf(x).items.map((it) => it.siteId) : [])));
@@ -1179,7 +1198,7 @@ function arrivalFits(o, i, answers) {
     const trial = d.items.concat([{ siteId: id, siteName: p.name, slotIndex: Math.max(d.items.length ? last.slotIndex + last.durationSlots : 0, opensT(p)), durationSlots: p.slots }]);
     const out = pack.packTrip([prevDay, { items: trial }], lookup)[1].items;
     if (!out.every((it, k) => k === trial.length - 1 || it.slotIndex === trial[k].slotIndex)) continue;
-    if (out.at(-1).slotIndex + p.slots > Math.min(p.category.every((c) => OUTDOORS.includes(c)) ? 24 : 20, closesT(p))) continue; // and inside its hours
+    if (out.at(-1).slotIndex + p.slots > endByT(p, answers.pace)) continue; // by 6 PM (8 PM if it may run late), and inside its hours
     const again = pack.packTrip([prevDay, { items: out }], lookup)[1].items;
     if (again.every((it, k) => it.slotIndex === out[k].slotIndex && it.slotIndex + it.durationSlots <= 28)) return id;
   }
@@ -1221,15 +1240,23 @@ test("opening hours from the app: a stop the builder adds is inside them, and no
   // a day out too. From Queenstown, half an hour to Arrowtown: the Lakes District Museum from 9, when it opens, not 8:30
   assert.deepEqual(dayOut(pack, lookup, at("queenstown-bay-beach", 16, 2), { pace: "some" }, [P["lakes-district-museum-and-gold-panning"]], [P["queenstown-gardens"]]).map((it) => [it.siteId, it.slotIndex]),
     [["lakes-district-museum-and-gold-panning", 2], ["queenstown-gardens", 6]]);
-  // and back by its evening place's close: Christchurch and back in 7 days at 2 hours a day, food off, spends its last day out
-  // at Akaroa (the lighthouse, the harbour lookout) and is back at Willowbank 1:30 to 4, which shuts at 5; the harbour cruise
-  // as well would bring it back at 4
-  const cb = buildTrips(data, pack, { start: "christchurch", end: "christchurch", days: 7, drive: 120, pace: "some", food: false, vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }).find((x) => x.kind === "built");
-  assert.deepEqual([cb.days[6].block, cb.days[6].items.map((it) => [it.siteId, it.slotIndex])], ["rest-christchurch", [["akaroa-lighthouse-and-garden-of-tane", 3], ["akaroa-harbour-lookout", 7], ["willowbank-wildlife-reserve", 11]]]);
-  assert.ok(cb.days[6].items[2].slotIndex + cb.days[6].items[2].durationSlots <= P["willowbank-wildlife-reserve"].close);
+  // and each stop of a day out done by its close: Picton to Nelson in 21 days at 6 hours a day, Easy, food on, spends a spare
+  // day in Wānaka (day 10) out in Queenstown: the bike hire, the bungy, then the Frankton Track at 4, not the Shotover Jet
+  // (4 to 5:30; it shuts at 5), and back for the evening at the Cardrona Hotel
+  const pn = buildTrips(data, pack, { start: "picton", end: "nelson", days: 21, drive: 360, pace: "easy", food: true, vibes: ["adventure"], into: ["Adventure", "Water"], activities: ["stargazing", "wildlife"] }).find((x) => x.key === "built-picton-21-oneway");
+  assert.deepEqual([pn.days[9].block, pn.days[9].items.map((it) => [it.siteId, it.slotIndex])], ["rest-wanaka", [["around-the-basin-bike-hire", 3], ["kawarau-bridge-bungy", 12], ["frankton-track-and-frankton-beach", 16], ["cardrona-hotel", 22]]]);
+  assert.deepEqual([P["shotover-jet"].close, pn.days.some((d) => d.items.some((it) => it.siteId === "shotover-jet"))], [18, false]);
   // across the sweep
   const RM = ARRIVE.evening.christchurch; // "assume that riverside market is an option always": not held to its hours
-  let added = 0, timed = 0, fyffe = 0, onsen = 0, pipi = 0; const early = [], late = [], movedUp = [];
+  // and nothing the builder adds runs past 6 PM, a walk as much as a museum (owner, 2026-11-25: "doing bridle path at 6
+  // makes no sense"; "empty time in the evenings is ok"), but what may: "only things that could go after 6 are restaurants,
+  // lookouts and west coast beaches", to 8 PM, and the markets
+  const lateSights = Object.values(P).filter((p) => lateOk(p) && !p.category.includes("Food")).map((p) => p.name).sort();
+  assert.deepEqual(lateSights, ["Akaroa Harbour Lookout", "Bluff Hill Lookout (Motupōhue)", "Bruce Bay", "Crown Range Summit Lookout", "Devil's Staircase Lookout", "Florence Hill Lookout", "Hawkes Lookout",
+    "Hokitika Beach", "Kaikōura Lookout", "Knights Point Lookout", "Lindis Pass Summit Lookout", "Otira Viaduct Lookout", "Peters Lookout", "Signal Hill Lookout", "Tauranga Bay Beach", "The Neck Lookout"]);
+  assert.deepEqual(["cardrona-hotel", "bridle-path", "kaiteriteri-beach", "gillespies-beach", "lake-hauroko-lookout-track", "queen-charlotte-drive-cullen-point", "tekapo-springs"].map((id) => lateOk(P[id])), [true, false, false, false, false, false, false]);
+  for (const p of Object.values(P)) assert.equal(lateOk(p), lateOkT(p), p.id);
+  let added = 0, timed = 0, fyffe = 0, onsen = 0, pipi = 0, all = 0, after6 = 0; const early = [], late = [], movedUp = [], evening = [];
   for (const { answers, options } of sweep) for (const o of options) o.days.forEach((d, i) => {
     const own = new Map((blockOf(d) || { items: [] }).items.map((it) => [it.siteId, it.slotIndex])), why = `${name(answers)} ${o.key} day ${i + 1} `;
     d.items.forEach((it, k) => {
@@ -1237,6 +1264,11 @@ test("opening hours from the app: a stop the builder adds is inside them, and no
       if (it.siteId === "fyffe-house") fyffe++;
       if (it.siteId === "onsen-hot-pools") onsen++;
       if (it.siteId === "fat-pipi-pizza") { pipi++; assert.ok(k > 0 && it.slotIndex >= 18, why + "Fat Pipi Pizza first, or before 5 PM"); }
+      if (!own.has(it.siteId) && it.siteId !== RM && answers.pace !== "hikes") { // (Lots of walking: left as it was for now)
+        all++;
+        if (answers.pace !== "hikes" && it.slotIndex + it.durationSlots > 20) after6++;
+        if (it.slotIndex + it.durationSlots > addEndT(p, answers.pace)) evening.push(why + it.siteId + " to " + pack.slotIndexToTimeLabel(it.slotIndex + it.durationSlots));
+      }
       if (p.open == null) return;
       timed++;
       if (!own.has(it.siteId)) {
@@ -1250,6 +1282,21 @@ test("opening hours from the app: a stop the builder adds is inside them, and no
   console.log(`stops with opening hours in the sweep: ${timed}, added by the builder ${added}; Fyffe House ${fyffe}, Onsen ${onsen}, Fat Pipi Pizza ${pipi}`);
   assert.ok(added > 500 && fyffe > 0 && onsen > 0 && pipi > 0);
   assert.deepEqual([early.slice(0, 5), late.slice(0, 5), movedUp.slice(0, 5)], [[], [], []], `${early.length} before opening, ${late.length} past closing, ${movedUp.length} moved up to before opening`);
+  console.log(`stops the builder adds in the sweep: ${all}, ending after 6 PM (lookouts, West Coast beaches, somewhere to eat) ${after6}`);
+  assert.deepEqual(evening.slice(0, 8), [], `${evening.length} of ${all} stops the builder adds run past 6 PM (8 PM for those that may)`);
+  assert.ok(after6 > 0, "none runs late at all");
+  // a stop the builder added that a later re-timing pushes past its end goes too: Picton and back in 10 days at 2 hours a
+  // day, Easy, food off: day 7 (Hokitika to Westport) had the Kawatiri Coastal Trail from 2 to 6; timed again once the spare
+  // day before it was filled, the trail would run to 6:30, so the day ends at Cape Foulwind
+  const nature = { vibes: ["nature"], into: ["Scenic"], activities: ["hot-pools"] }, adv = { vibes: ["adventure"], into: ["Adventure", "Water"], activities: ["stargazing", "wildlife"] };
+  const pl = buildTrips(data, pack, { start: "picton", end: "picton", days: 10, drive: 120, pace: "easy", food: false, ...nature }).find((x) => x.key === "built-picton-10-loop");
+  assert.deepEqual([pl.days[6].block, pl.days[6].items.map((it) => it.siteId)], ["hokitika-beach-driftwood-sign..star-tavern-cape-foulwind", ["pororari-river-track", "cape-foulwind-walkway-seal-colony"]]);
+  // a day out comes home to a place that may run late, if the town has one to spare: Picton to Nelson in 10 days at 2 hours a
+  // day, Easy, food on, spends day 2, a spare day in Nelson, at Nelson Lakes (three stops) and is back at Māpua Wharf, 3 to
+  // 5; coming home to Rabbit Island (4 hours, done by 6) would leave time for two
+  const nl = buildTrips(data, pack, { start: "picton", end: "nelson", days: 10, drive: 120, pace: "easy", food: true, ...adv }).find((x) => x.key === "built-picton-10-oneway");
+  assert.deepEqual([nl.days[1].block, nl.days[1].items.map((it) => it.siteId)], ["rest-nelson", ["lake-rotoiti-jetty-kerr-bay", "kawatiri-historic-railway-walk", "kerr-bay-short-walks", "mapua-wharf"]]);
+  assert.deepEqual([lateOk(P["mapua-wharf"]), lateOk(P["moturoa-rabbit-island"])], [true, false]);
 });
 
 test("Mt John before the Dark Sky night, ahead of Tekapo Springs, and the next day leaves earlier (owner, 2026-11-25)", () => {

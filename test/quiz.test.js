@@ -558,6 +558,8 @@ test("stepFromHash", () => {
   assert.equal(stepFromHash(""), 0);
   assert.equal(stepFromHash("#x"), 0);
   assert.equal(stepFromHash("#99"), 0);
+  assert.equal(stepFromHash("#19"), STEPS.indexOf("reveal"));
+  assert.equal(stepFromHash("#-1"), 0);
 });
 
 test("tripPhotos: a different photo for each trip, never Food, from day 2 on", () => {
@@ -610,6 +612,6 @@ test("email box: markup, state, round trip through Google/Apple", () => {
   assert.match(src, /root\.addEventListener\("change", function \(e\) \{ if \(e\.target\.id === "q-optin"\) acct\.optIn = e\.target\.checked; \}\);/);
   assert.match(src, /acct\.mode = v; acct\.error = ""; render\(\);/);
   assert.match(src, /act === "again"[^\n]*optIn: false/);
-  assert.equal((src.match(/optIn: acct\.optIn/g) || []).length, 2, "goGoogle and goApple store the tick");
+  assert.equal((src.match(/optIn: acct\.mode === "create" && acct\.optIn \}/g) || []).length, 2, "goGoogle and goApple store the tick");
   assert.match(src, /optIn = sv && sv\.optIn === true/);
 });

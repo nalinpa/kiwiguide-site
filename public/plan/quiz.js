@@ -362,6 +362,7 @@ function driveLine(minutes, limit) {
 
 function stepFromHash(hash) {
   var n = parseInt(String(hash).replace("#", ""), 10);
+  if (n === 19) return STEPS.indexOf("reveal"); // old done screen
   return n >= 0 && n < STEPS.length ? n : 0;
 }
 
@@ -1012,13 +1013,13 @@ if (typeof document !== "undefined") (function () {
   // Off to Google. The state and nonce wait in sessionStorage (the quiz answers already do); the tokens never do.
   function goGoogle() {
     var state = newToken(), nonce = newToken();
-    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, optIn: acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, optIn: acct.mode === "create" && acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
     location.assign(googleAuthUrl(location.origin, state, nonce));
   }
   // Off to Apple, the same way; Apple gets the nonce's hash (Firebase checks it against the nonce itself).
   function goApple() {
     var state = newToken(), nonce = newToken();
-    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple", optIn: acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple", optIn: acct.mode === "create" && acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
     sha256Hex(nonce).then(function (h) { location.assign(appleAuthUrl(location.origin, state, h)); }, function () { setErr(authErrorMessage("")); });
   }
   // The visitor is back from Google or Apple: sign in with its answer, then on as for email.

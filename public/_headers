@@ -23,7 +23,7 @@
   X-Robots-Tag: noindex
 
 # The trip quiz shows place photos from the engine image host (img-src) and saves the trip through
-# Google Analytics (measure.js: the tag, its beacons and images), Firebase sign-up and Google sign-in by redirect (no Google script; nothing extra needed here), and the engine api (connect-src; 'self' keeps trips.json loading).
+# Google Analytics (measure.js: the tag, its beacons and images), Firebase sign-up and the email answer on the visitor's own users/{uid} record (Firestore), Google sign-in by redirect (no Google script; nothing extra needed here), and the engine api (connect-src; 'self' keeps trips.json loading).
 /plan/*
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com; img-src 'self' https://api.blacksands.app https://*.google-analytics.com https://*.googletagmanager.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://api.blacksands.app https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com

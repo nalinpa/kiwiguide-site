@@ -438,7 +438,16 @@ test("guard: no trip cards or trip without a sign-in or a save; the account step
   const open = renderSrc.indexOf("if (ok !== step)"), guard = renderSrc.indexOf('if (name === "account" && (saved'), data = renderSrc.indexOf("if (NEEDS_DATA[name]");
   assert.ok(open > 0 && open < guard && guard < data);
   // the saved info is for the trip picked: a new pick (answers changed) is not saved
-  assert.match(src, /function savedInfo\(\) \{[^\n]*d\.pick === st\.pick/);
+  // and needs a pick: a Keep with none (pick: null === null) would loop reveal → choice → account → reveal, past a reload
+  assert.match(src, /function savedInfo\(\) \{[^\n]*d\.pick && d\.pick === st\.pick/);
+  // the copy in memory first: it is always the newest
+  assert.match(src, /function savedInfo\(\) \{ var d = savedMem; if \(!d\) try \{ d = JSON\.parse\(sessionStorage\.getItem\(SAVED\)\); \}/);
+  // coming to the cards from another step (not a re-render after a save), nothing is left from an earlier save: no old dialog
+  // (so no Keep with no pick), no old error blocking the one-trip save
+  assert.match(renderSrc, /if \(name === "choice" && shown !== "choice" && !g\.busy\(\)\) \{ acct\.error = acct\.note = ""; acct\.existing = null; \}/);
+  const clear = renderSrc.indexOf('shown !== "choice"');
+  assert.ok(renderSrc.indexOf('if ((name === "choice" && !session)') < clear && clear < renderSrc.indexOf("if (NEEDS_DATA[name]"), "after the guards, before the wait screen");
+  assert.match(src, /function painted\(name\) \{\s*shown = name;/);
   assert.match(src, /var NEEDS_DATA = \{ into: 1, choice: 1, reveal: 1 \};/);
   assert.ok(!/name === "done"|S\.done|done: function/.test(src), "no done screen");
   assert.ok(!STEPS.includes("done"));
@@ -480,7 +489,7 @@ test("account screen: the owner's framing, sign-in only (no save), then the trip
   assert.ok(!acc.includes("thisTrip") && !acc.includes("session") && !acc.includes("q-dialog"), "no trip, no Saving to, no dialog");
   assert.ok(!src.includes("Save your trip") && !src.includes("Save this trip"));
   // every sign-in ends in afterSignIn: the session, sign_up for a new account, the cards
-  assert.match(src, /function afterSignIn\(s, by\) \{\s*session = s;\s*acct\.error = acct\.note = "";[^\n]*\s*if \(s\.isNew\) track\("sign_up", \{ method: by \}\);\s*go\(S\.choice\);\s*\}/);
+  assert.match(src, /function afterSignIn\(s, by\) \{\s*session = s;\s*if \(s\.isNew\) track\("sign_up", \{ method: by \}\);\s*go\(S\.choice\);\s*\}/);
   assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, "email"\); \}\);/);
   assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, by\); \}\);/);
   assert.equal((src.match(/track\("sign_up"/g) || []).length, 1);

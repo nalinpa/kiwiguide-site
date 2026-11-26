@@ -413,7 +413,8 @@ if (typeof document !== "undefined") (function () {
   var g = guard(); // one sign-in, save or replace at a time
   // The trip saved (or kept) for the trip picked: { email, title, kept, pick }. A copy in memory for when sessionStorage is off.
   var savedMem = null;
-  function savedInfo() { var d = savedMem; try { d = JSON.parse(sessionStorage.getItem(SAVED)) || d; } catch (e) { /* the copy in memory */ } return d && typeof d.email === "string" && typeof d.title === "string" && d.pick === st.pick ? d : null; }
+  function savedInfo() { var d = savedMem; if (!d) try { d = JSON.parse(sessionStorage.getItem(SAVED)); } catch (e) { /* none */ } return d && typeof d.email === "string" && typeof d.title === "string" && d.pick && d.pick === st.pick ? d : null; }
+  var shown = ""; // the step last painted: a re-render of the cards (after a save) keeps its error and dialog, coming back doesn't
 
   // The builder's data and pack.js load once the first answer is in (or straight away on a reload mid-quiz).
   var load = { status: "idle" };
@@ -704,6 +705,7 @@ if (typeof document !== "undefined") (function () {
     // no trip cards without a sign-in, and no trip that isn't saved (a reload loses the sign-in: tokens are never stored)
     if (name === "account" && (saved || session)) { location.replace("#" + (saved ? S.reveal : S.choice)); return; }
     if ((name === "choice" && !session) || (name === "reveal" && !saved)) { location.replace("#" + (session ? S.choice : S.account)); return; }
+    if (name === "choice" && shown !== "choice" && !g.busy()) { acct.error = acct.note = ""; acct.existing = null; }
     if (NEEDS_DATA[name] && load.status !== "ready") {
       loadData();
       root.innerHTML = dots(waitScreen(load.status));
@@ -812,6 +814,7 @@ if (typeof document !== "undefined") (function () {
     startHint(card, yes, no);
   }
   function painted(name) {
+    shown = name;
     bar.style.width = PROGRESS[name] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[name]);
     backBtn.hidden = name === "start" || name === "reveal";
@@ -997,7 +1000,6 @@ if (typeof document !== "undefined") (function () {
   // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until a trip is picked.
   function afterSignIn(s, by) {
     session = s;
-    acct.error = acct.note = ""; // no dialog or error left from an earlier sign-in (a Keep, then the answers changed)
     if (s.isNew) track("sign_up", { method: by });
     go(S.choice);
   }

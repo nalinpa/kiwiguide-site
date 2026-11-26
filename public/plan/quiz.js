@@ -14,7 +14,7 @@ var TOWNS = [
   { id: "invercargill", out: "Fly out of Invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "Friendly and unhurried and your way in to Bluff, the Catlins and the ferry across to Stewart Island.", img: PHOTO + "a2f24963-ec1c-4a10-a50c-31733b302595.webp", more: true },
 ];
 
-var STEPS = ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "choice", "reveal", "account", "done"];
+var STEPS = ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal"];
 
 // "How long have you got?", the first quiz's rough lengths: each opens the days picker on its top number (2 to 21 days).
 var BANDS = [
@@ -376,9 +376,9 @@ if (typeof document !== "undefined") (function () {
   var root = document.getElementById("q");
   var bar = document.getElementById("bar");
   var backBtn = document.getElementById("back");
-  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, choice: 96, reveal: 100, account: 100, done: 100 };
+  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, account: 94, choice: 97, reveal: 100 };
   var S = {}; STEPS.forEach(function (n, i) { S[n] = i; });
-  var NEEDS_DATA = { into: 1, choice: 1, reveal: 1, account: 1 };
+  var NEEDS_DATA = { into: 1, choice: 1, reveal: 1 };
   var CHIPS = [3, 5, 7, 10, 12, 14, 17, 21];
   var draft = null; // the days picker's number, or a pick list's ids, until Next
   var allTowns = false, allEnds = false; // "Somewhere else?" tapped: the start (or finish) screen shows every town
@@ -408,10 +408,12 @@ if (typeof document !== "undefined") (function () {
     try { gsaved = JSON.parse(sessionStorage.getItem(GOOGLE)); } catch (e) { /* refused later */ } finally { try { sessionStorage.removeItem(GOOGLE); } catch (e2) { /* fine */ } }
     history.replaceState(null, "", location.pathname + location.search + "#" + S.account);
   }
-  var session = null; // { idToken, email }: in memory only, never stored
-  var acct = { mode: "create", error: "", note: "", existing: null, email: "" };
+  var session = null; // { idToken, email, uid, isNew }: in memory only, never stored
+  var acct = { mode: "create", error: "", note: "", existing: null, email: "", optIn: false };
   var g = guard(); // one sign-in, save or replace at a time
-  function savedInfo() { try { var d = JSON.parse(sessionStorage.getItem(SAVED)); if (d && typeof d.email === "string" && typeof d.title === "string") return d; } catch (e) { /* none */ } return null; }
+  // The trip saved (or kept) for the trip picked: { email, title, kept, pick }. A copy in memory for when sessionStorage is off.
+  var savedMem = null;
+  function savedInfo() { var d = savedMem; try { d = JSON.parse(sessionStorage.getItem(SAVED)) || d; } catch (e) { /* the copy in memory */ } return d && typeof d.email === "string" && typeof d.title === "string" && d.pick === st.pick ? d : null; }
 
   // The builder's data and pack.js load once the first answer is in (or straight away on a reload mid-quiz).
   var load = { status: "idle" };
@@ -437,7 +439,6 @@ if (typeof document !== "undefined") (function () {
   function onLoaded() {
     if (!NEEDS_DATA[STEPS[stepFromHash(location.hash)]]) return; // don't reset a screen the visitor is using
     render();
-    if (googlePending && load.status === "ready") { googlePending = false; if (st.pick && STEPS[stepFromHash(location.hash)] === "account" && thisTrip()) finishGoogle(); }
   }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -509,7 +510,7 @@ if (typeof document !== "undefined") (function () {
 
   function prevStep(step) {
     var name = STEPS[step];
-    if (name === "reveal") { var o = options(); return typeof o !== "string" && o.length === 1 ? prevStep(S.choice) : S.choice; }
+    if (name === "choice" && session) return S.heard; // signed in: the account step would only send the visitor back here
     if (name === "pace") return st.season && st.season !== "unsure" ? S.month : S.season;
     return backStep(step);
   }
@@ -632,17 +633,26 @@ if (typeof document !== "undefined") (function () {
         HEARD.map(function (h) { return choice(h.label, "", "heard", h.id, st.heard === h.id); }).join("") +
         '<button type="button" class="q-cta q-next" data-act="heard" data-val="skip">Skip</button>';
     },
+    // Picking a trip saves it (one trip: render saves it on its own). The account's own trip asks Replace or Keep here.
     choice: function () {
-      var list = options(), photos = tripPhotos(list);
-      return '<p class="q-kicker">' + list.length + " trips fit " + (st.end === st.start ? town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
+      var list = options(), photos = tripPhotos(list), dialog = "";
+      if (session && acct.note === "has-trip") {
+        var x = acct.existing, dt = tripDates(x.startDate, x.endDate);
+        dialog = '<dialog class="q-dialog" id="q-dialog" aria-labelledby="q-dlg-h"><h2 id="q-dlg-h">Your account already has a trip</h2><p>This will replace your current trip.</p>' +
+          '<p class="q-small">' + esc((x.title || "Your trip") + (dt ? " · " + dt : "")) + '</p><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
+          '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace it</button><button type="button" class="q-again" id="q-keep" data-act="keep" autofocus>Keep my trip</button></div></dialog>';
+      }
+      return '<p class="q-kicker">' + (list.length === 1 ? "1 trip fits " : list.length + " trips fit ") + (st.end === st.start ? town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
+        '<p class="q-status" id="q-status" role="status"></p>' + (acct.error && !dialog ? '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" : "") +
         list.map(function (t, n) {
           var built = t.kind === "built";
           return '<button type="button" class="q-trip" data-act="pick" data-val="' + esc(t.key) + '">' + (photos[n] ? '<img src="' + esc(photos[n]) + '" alt="" width="640" height="240">' : "") +
             '<span class="q-trip-text"><b class="q-badge ' + (built ? "q-built" : "q-sugg") + '">' + (built ? "Built for you" : "Hand-checked trip") + "</b><strong>" + esc(t.label) + "</strong><span>" + esc(routeLine(t)) + "</span><em>" + days(t.days.length) + " · " + esc(endLabel(t)) + "</em></span></button>";
-        }).join("");
+        }).join("") + dialog;
     },
+    // The end: the trip, saved (or, on Keep, the account's own trip kept), and how to open it in the app
     reveal: function () {
-      var t = thisTrip(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
+      var t = thisTrip(), d = savedInfo(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
       var missing = t.missing.map(function (a) { return labelOf(ACTIVITIES, a).toLowerCase(); });
       // Where each picked activity is: one line per activity, naming its places and days, after the trip (so Day 1 is on a phone's first screen).
       var notes = acts.map(function (a) {
@@ -653,31 +663,22 @@ if (typeof document !== "undefined") (function () {
       if (tv.pick !== st.pick) tv = { pick: st.pick, view: "trip", day: tv.day }; // another trip opens on Trip; the open day stays if it has one (paintTrip clamps it)
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when"><b>From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + '</b><br><span class="q-nb">' + days(t.days.length) + (w ? " · " + w : "") + ".</span> Change the dates in the app.</p>" +
-        // Save at the top, before the trip (the owner, 2026-11-23)
-        '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">Save this trip</button><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' +
+        // saved, and the app's two steps, at the top, before the trip (the owner, 2026-11-23 and 2026-11-26)
+        '<p class="q-lead">' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : "Saved to " + d.email) + "</p>" +
+        '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
+        "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>" +
+        '<div class="q-actions q-stack"><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
         (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
         '<div id="tv" class="q-days tv"></div>' + notes +
         (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "");
     },
+    // The account before any trip shows (owner, 2026-11-26): sign in only; the trip is saved when it is picked
     account: function () {
-      var t = thisTrip();
-      var kicker = '<p class="q-kicker">' + esc(t.label) + "</p>";
-      var dialog = "";
-      if (session && acct.note === "has-trip") {
-        var x = acct.existing, dt = tripDates(x.startDate, x.endDate);
-        dialog = '<dialog class="q-dialog" id="q-dialog" aria-labelledby="q-dlg-h"><h2 id="q-dlg-h">Your account already has a trip</h2><p>This will replace your current trip.</p>' +
-          '<p class="q-small">' + esc((x.title || "Your trip") + (dt ? " · " + dt : "")) + '</p><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
-          '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace it</button><button type="button" class="q-again" id="q-keep" data-act="keep" autofocus>Keep my trip</button></div></dialog>';
-      }
-      if (session) {
-        return kicker + '<h1 tabindex="-1">Save your trip</h1><p class="q-lead">Saving to ' + esc(session.email) + ".</p>" +
-          (acct.note === "has-trip" ? "" : '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>") +
-          '<button type="button" class="q-cta" data-act="retry">' + (acct.error ? "Try again" : "Save trip") + "</button>" + dialog;
-      }
+      var kicker = '<p class="q-kicker">Last step</p>';
       var mode = acct.mode;
-      var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in to save your trip" : "Save your trip";
-      var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "Make a free Kiwi Guide account. Sign in to the app with it and your trip is waiting.";
+      var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in and we'll build your trip" : "Create your free account and we'll build your trip";
+      var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "It'll be waiting in the Kiwi Guide app when you sign in.";
       var dby = ' aria-describedby="q-err"';
       var google = mode === "forgot" ? "" : (APPLE_ON ? '<button type="button" class="q-apple" data-act="apple">' + A_MARK + "<span>Continue with Apple</span></button>" : "") +
         '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
@@ -691,14 +692,6 @@ if (typeof document !== "undefined") (function () {
           (mode === "signin" ? '<button type="button" class="q-link" data-act="mode" data-val="forgot">Forgot password?</button> · ' : "") + '<button type="button" class="q-link" data-act="mode" data-val="create">Create account</button>') + "</p>" +
         (mode === "create" ? '<p class="q-terms">By creating an account you agree to the <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.</p>' : "");
     },
-    done: function () {
-      var d = savedInfo();
-      return '<div class="q-done"><div class="q-tick"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
-        '<h1 tabindex="-1">' + (d.kept ? "Your trip is unchanged" : "Your trip is saved") + '</h1><p class="q-lead">' + esc(d.title) + "</p>" +
-        '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
-        "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>" +
-        '<button type="button" class="q-again" data-act="again">Start again</button></div>';
-    },
   };
   var PICK_KEY = { vibe: "vibes" };
 
@@ -706,17 +699,19 @@ if (typeof document !== "undefined") (function () {
     removeKeys();
     stopHint();
     var step = stepFromHash(location.hash), name = STEPS[step];
-    var ok = firstOpenStep(st, step);
-    if (name === "account" && savedInfo()) { location.replace("#" + S.done); return; }
-    if (name === "done" && !savedInfo()) { location.replace("#" + (ok === S.done ? S.reveal : ok)); return; }
+    var ok = firstOpenStep(st, step), saved = savedInfo(), auto = false;
     if (ok !== step) { location.replace("#" + ok); return; }
+    // no trip cards without a sign-in, and no trip that isn't saved (a reload loses the sign-in: tokens are never stored)
+    if (name === "account" && (saved || session)) { location.replace("#" + (saved ? S.reveal : S.choice)); return; }
+    if ((name === "choice" && !session) || (name === "reveal" && !saved)) { location.replace("#" + (session ? S.choice : S.account)); return; }
     if (NEEDS_DATA[name] && load.status !== "ready") {
       loadData();
       root.innerHTML = dots(waitScreen(load.status));
       return painted(name);
     }
-    if (name === "choice") { var list = options(); if (list.length === 1) { st.pick = list[0].key; save(); location.replace("#" + S.reveal); return; } }
-    if ((name === "reveal" || name === "account") && !thisTrip()) { st.pick = null; save(); location.replace("#" + S.choice); return; }
+    // one trip for the answers: saved on its own, once (not while a save runs, after a failed one, or with the dialog up)
+    if (name === "choice") { var list = options(); if (list.length === 1 && session && !g.busy() && !acct.error && !acct.note) { st.pick = list[0].key; save(); auto = true; } }
+    if (name === "reveal" && !thisTrip()) { st.pick = null; save(); location.replace("#" + S.choice); return; }
     if (name === "reveal" && st.pick !== revealed) {
       revealed = st.pick; try { sessionStorage.setItem("kg-revealed", revealed); } catch (e) { /* fires again */ }
       track("quiz_reveal", Object.assign({ trip: st.pick }, measureParams(thisTrip(), st)));
@@ -728,9 +723,10 @@ if (typeof document !== "undefined") (function () {
     }
     draft = name === "days" ? st.days || Math.max(bandOf(st.band).days, least()) : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
     root.innerHTML = dots(screens[STEPS[step]]());
-    // tripview.js lost on the way (one dropped request): say so; the screen still finishes, and Save still builds the trip
+    // tripview.js lost on the way (one dropped request): say so; the screen still finishes (the trip is saved already)
     if (name === "reveal") try { paintTrip(); } catch (e) { document.getElementById("tv").innerHTML = '<p class="q-error">Your days would not show. Reload the page to see them.</p>'; }
     painted(name);
+    if (auto) doSave();
     if (name === "into") {
       setupDeck();
       // after an answer, focus stays on the button just used (it names the new card), not back on the heading
@@ -818,7 +814,7 @@ if (typeof document !== "undefined") (function () {
   function painted(name) {
     bar.style.width = PROGRESS[name] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[name]);
-    backBtn.hidden = name === "start" || name === "done";
+    backBtn.hidden = name === "start" || name === "reveal";
     document.body.classList.toggle("q-photo", !!root.querySelector(".q-brk:not(.q-brk-card)"));
     if (notice) { root.insertAdjacentHTML("afterbegin", '<p class="q-error" role="alert">' + esc(notice) + "</p>"); notice = ""; }
     root.scrollTop = 0;
@@ -828,9 +824,9 @@ if (typeof document !== "undefined") (function () {
     if (name === "account") {
       var f = document.getElementById("q-email");
       if (f) { f.value = acct.email; f.focus({ preventScroll: true }); }
-      var dlg = document.getElementById("q-dialog");
-      if (dlg) { dlg.showModal(); document.getElementById("q-keep").focus(); }
     }
+    var dlg = document.getElementById("q-dialog");
+    if (dlg) { dlg.showModal(); document.getElementById("q-keep").focus(); }
   }
 
   // The days picker: the number, the slider and the chips move together.
@@ -885,7 +881,7 @@ if (typeof document !== "undefined") (function () {
       go(S.break2);
     }
     else if (act === "food") { answered("food", v); st.food = v === "yes"; st.pick = null; save(); go(S.heard); }
-    else if (act === "heard") { answered("heard", v); st.heard = v; save(); go(S.choice); }
+    else if (act === "heard") { answered("heard", v); st.heard = v; save(); go(S.account); }
     else if (act === "tv-view" || act === "tv-tab") {
       if (act === "tv-view") tv.view = v; else tv.day = +v;
       paintTrip();
@@ -899,13 +895,11 @@ if (typeof document !== "undefined") (function () {
       if (WIDE.matches) root.querySelector('[data-act="tv-day"][data-val="' + v + '"]').focus({ preventScroll: true });
       else { document.getElementById("tv").scrollIntoView(); root.querySelector('.tv-tab[aria-pressed="true"]').focus({ preventScroll: true }); }
     }
-    else if (act === "pick") { answered("choice", v); st.pick = v; save(); go(S.reveal); }
-    else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; deck = null; allTowns = allEnds = false; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "" }; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
-    else if (act === "save") { acct.error = ""; acct.note = ""; go(S.account); }
+    else if (act === "pick") { answered("choice", v); st.pick = v; save(); doSave(); }
+    else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; deck = null; allTowns = allEnds = false; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "", optIn: false }; savedMem = null; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();
     else if (act === "apple") goApple();
-    else if (act === "retry") doSave();
     else if (act === "reload") { load = retryLoad(load); render(); }
     else if (act === "replace") doReplace();
     else if (act === "keep") keepIt();
@@ -927,9 +921,10 @@ if (typeof document !== "undefined") (function () {
   }
   function newBody() { return tripBody(thisTrip(), startDateFor(st, new Date()), function () { return crypto.randomUUID(); }); }
   function finish(email, title, kept) {
-    try { sessionStorage.setItem(SAVED, JSON.stringify({ email: email, title: title, kept: !!kept })); } catch (e) { /* the screen still shows this time */ }
+    savedMem = { email: email, title: title, kept: !!kept, pick: st.pick };
+    try { sessionStorage.setItem(SAVED, JSON.stringify(savedMem)); } catch (e) { /* the copy in memory shows it this time */ }
     session = null;
-    go(S.done);
+    go(S.reveal);
   }
 
   // Every failure ends in a re-render or a re-enabled form, never a stuck disabled button.
@@ -937,14 +932,16 @@ if (typeof document !== "undefined") (function () {
     var sb = document.getElementById("q-status"); if (sb) sb.textContent = "";
     // the email has a password account: back to Sign in with it filled in, message kept
     if (err && !session && (err.code === "NEED_CONFIRMATION" || err.code === "FEDERATED_USER_ID_ALREADY_LINKED")) {
-      acct = { mode: "signin", error: authErrorMessage(err.code), note: "", existing: null, email: err.email || acct.email };
+      acct = { mode: "signin", error: authErrorMessage(err.code), note: "", existing: null, email: err.email || acct.email, optIn: false };
       return render();
     }
     if (err && typeof err.code === "string") { setDisabled(false); var m = authErrorMessage(err.code); setErr(m, fieldFor(err.code)); return; }
+    // the sign-in ran out before the save: back to the account step to sign in again
     if (err && err.status === 401) {
-      acct = { mode: "signin", error: saveErrorMessage(401), note: "", existing: null, email: session ? session.email : "" };
-      session = null; return render();
+      acct = { mode: "signin", error: saveErrorMessage(401), note: "", existing: null, email: session ? session.email : "", optIn: false };
+      session = null; return go(S.account);
     }
+    // any other failed save: the trip cards again with the error; a tap on a card tries again
     if (session) { acct.error = err && typeof err.status === "number" ? saveErrorMessage(err.status, err.error) : authErrorMessage(""); return render(); }
     setDisabled(false); setErr(authErrorMessage(""));
   }
@@ -961,8 +958,9 @@ if (typeof document !== "undefined") (function () {
     finish(session.email, thisTrip().label);
   }
   function doSave() {
-    acct.error = "";
+    acct.error = ""; setErr("");
     run(function () { return saveFlow(fetch.bind(window), session.idToken, newBody()); }, afterSave);
+    var sb = document.getElementById("q-status"); if (sb && g.busy()) sb.textContent = "Building your trip…"; // fail() clears it
   }
   function doReplace() {
     acct.error = "";
@@ -992,13 +990,17 @@ if (typeof document !== "undefined") (function () {
       return run(function () { return resetPassword(net, email); }, function () { setDisabled(false); setErr("If that email has an account, a reset link is on its way.", null, true); });
     }
     run(function () {
-      return (acct.mode === "signin" ? signIn(net, email, passEl.value) : createAccount(net, email, passEl.value, document.getElementById("q-pass2").value)).then(function (s) {
-        if (acct.mode === "create") track("sign_up", { method: "email" });
-        session = s;
-        return saveFlow(net, s.idToken, newBody());
-      });
-    }, afterSave);
+      return acct.mode === "signin" ? signIn(net, email, passEl.value) : createAccount(net, email, passEl.value, document.getElementById("q-pass2").value);
+    }, function (s) { afterSignIn(s, "email"); });
   });
+
+  // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until a trip is picked.
+  function afterSignIn(s, by) {
+    session = s;
+    acct.error = acct.note = ""; // no dialog or error left from an earlier sign-in (a Keep, then the answers changed)
+    if (s.isNew) track("sign_up", { method: by });
+    go(S.choice);
+  }
 
   // Off to Google. The state and nonce wait in sessionStorage (the quiz answers already do); the tokens never do.
   function goGoogle() {
@@ -1012,18 +1014,12 @@ if (typeof document !== "undefined") (function () {
     try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple" })); } catch (e) { return setErr(authErrorMessage("")); }
     sha256Hex(nonce).then(function (h) { location.assign(appleAuthUrl(location.origin, state, h)); }, function () { setErr(authErrorMessage("")); });
   }
-  // The visitor is back from Google or Apple: sign in with its answer, then the same save flow as for email.
+  // The visitor is back from Google or Apple: sign in with its answer, then on as for email.
   function finishGoogle() {
     var net = fetch.bind(window), r = gret, sv = gsaved, by = sv && sv.provider === "apple" ? "apple" : "google";
     gret = gsaved = null;
     var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with " + (by === "apple" ? "Apple" : "Google") + "…"; // render left it empty, so the change is announced; fail() clears it
-    run(function () {
-      return completeGoogle(net, r, sv, location.origin + "/plan/").then(function (s) {
-        if (s.isNew) track("sign_up", { method: by });
-        session = s;
-        return saveFlow(net, s.idToken, newBody());
-      });
-    }, afterSave);
+    run(function () { return completeGoogle(net, r, sv, location.origin + "/plan/"); }, function (s) { afterSignIn(s, by); });
   }
 
   backBtn.addEventListener("click", function () {
@@ -1039,11 +1035,11 @@ if (typeof document !== "undefined") (function () {
     if (!e.matches && tv.view === "days") document.getElementById("tv").scrollIntoView();
   });
 
-  // Back from Google (and not already saved): the sign-in finishes once the trip is built again.
-  var googlePending = gfrag && !savedInfo();
-  if (googlePending && !st.pick && !(gret && gret.error === "access_denied")) notice = "Your answers were lost on the way back from " + (gsaved && gsaved.provider === "apple" ? "Apple" : "Google") + ". Pick your trip again.";
+  // Back from Google or Apple (and not already saved): the sign-in finishes once the answers through How did you hear are in.
+  var googlePending = gfrag && !savedInfo(), answersIn = firstOpenStep(st, S.account) === S.account;
+  if (googlePending && !answersIn && !(gret && gret.error === "access_denied")) notice = "Your answers were lost on the way back from " + (gsaved && gsaved.provider === "apple" ? "Apple" : "Google") + ". Answer the questions again.";
   if (st.start) loadData();
-  try { render(); } catch (e) {
+  try { render(); if (googlePending && answersIn) finishGoogle(); } catch (e) {
     root.innerHTML = '<h1>Something went wrong</h1><p>The quiz hit a problem. Reload the page, or <a href="/#trips">see the suggested trips</a>.</p>';
   }
 })();

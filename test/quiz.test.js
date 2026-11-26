@@ -11,12 +11,13 @@ const at = (name) => STEPS.indexOf(name);
 const full = { start: "dunedin", end: "dunedin", band: "fortnight", days: 12, season: "summer", month: { month: 0, year: 2027 }, pace: "some", drive: 240, who: "couple", age: "30-44", vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"], heard: "google", pick: "built-dunedin-12-loop" };
 const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
 
-test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities; who's travelling and age after the driving, how did you hear about us the last question", () => {
-  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "choice", "reveal", "account", "done"]);
+test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities; who's travelling and age after the driving, how did you hear about us the last question; the account before the trip cards, the trip the end (owner, 2026-11-26)", () => {
+  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal"]);
   // the progress bar grows in the order asked, every step on it
   const bar = JSON.parse(src.match(/var PROGRESS = (\{[^}]*\});/)[1].replace(/(\w+):/g, '"$1":'));
   assert.deepEqual(Object.keys(bar), STEPS);
   STEPS.forEach((s, i) => { if (i) assert.ok(bar[s] >= bar[STEPS[i - 1]], s); });
+  assert.deepEqual([bar.account, bar.choice, bar.reveal], [94, 97, 100]);
 });
 
 test("who's travelling, age and how did you hear about us: kept with the quiz answers (analytics) only, the trip the same; age and how you heard can be skipped (owner, 2026-11-24)", () => {
@@ -44,7 +45,7 @@ test("who's travelling, age and how did you hear about us: kept with the quiz an
   assert.match(src, /act === "who"\) \{ answered\("who", v\); st\.who = v; save\(\); go\(S\.age\); \}/);
   assert.match(src, /act === "age"\) \{ answered\("age", v\); st\.age = v; save\(\); go\(S\.vibe\); \}/);
   assert.match(src, /act === "food"\) \{ answered\("food", v\); st\.food = v === "yes"; st\.pick = null; save\(\); go\(S\.heard\); \}/);
-  assert.match(src, /act === "heard"\) \{ answered\("heard", v\); st\.heard = v; save\(\); go\(S\.choice\); \}/);
+  assert.match(src, /act === "heard"\) \{ answered\("heard", v\); st\.heard = v; save\(\); go\(S\.account\); \}/);
   assert.match(src, /<h1 tabindex="-1">Who’s travelling\?<\/h1>/);
   assert.match(src, /<h1 tabindex="-1">How old are you\?<\/h1>/);
   assert.match(src, /<h1 tabindex="-1">How did you hear about us\?<\/h1>/);
@@ -243,6 +244,8 @@ test("cleanState: a full state passes; a bad answer drops it and everything afte
 test("firstOpenStep: no landing past a missing answer; the month only for a season", () => {
   const st = Q.cleanState(full, NOV20);
   assert.equal(Q.firstOpenStep(st, at("account")), at("account"));
+  assert.equal(Q.firstOpenStep({ ...st, pick: null }, at("account")), at("account"), "the account comes before the trip is picked");
+  assert.equal(Q.firstOpenStep({ ...st, heard: null }, at("account")), at("heard"));
   assert.equal(Q.firstOpenStep({ ...st, vibes: null }, at("into")), at("vibe"));
   assert.equal(Q.firstOpenStep({ ...st, vibes: null }, at("break2")), at("vibe"));
   assert.equal(Q.firstOpenStep({ ...st, food: null }, at("choice")), at("food"));
@@ -421,12 +424,94 @@ test("deckStart: a new deck opens on card 1; back to a finished one shows its la
   assert.deepEqual(Q.deckStart(ids, []), { idx: 2, yes: [] });
 });
 
-test("the reveal: Save this trip at the top, before the trip, not a bar at the bottom (owner, 2026-11-23)", () => {
+// The account before the trip (owner, 2026-11-26): docs/plans/website-signup-first.md in the app repo.
+const screen = (name, next) => src.slice(src.indexOf("    " + name + ": function"), src.indexOf("    " + next + ": function") > 0 ? src.indexOf("    " + next + ": function") : src.indexOf("var PICK_KEY"));
+const renderSrc = src.slice(src.indexOf("  function render() {"), src.indexOf("  // The one-time nudge"));
+
+test("guard: no trip cards or trip without a sign-in or a save; the account step moves on once signed in or saved", () => {
+  // account: saved already, the trip; signed in, the cards
+  assert.match(renderSrc, /if \(name === "account" && \(saved \|\| session\)\) \{ location\.replace\("#" \+ \(saved \? S\.reveal : S\.choice\)\); return; \}/);
+  // choice with no session, and reveal with nothing saved: the account (no session) or the cards (a session, nothing saved yet)
+  assert.match(renderSrc, /if \(\(name === "choice" && !session\) \|\| \(name === "reveal" && !saved\)\) \{ location\.replace\("#" \+ \(session \? S\.choice : S\.account\)\); return; \}/);
+  assert.match(renderSrc, /, saved = savedInfo\(\),/);
+  // after the missing-answer check, before the data loads
+  const open = renderSrc.indexOf("if (ok !== step)"), guard = renderSrc.indexOf('if (name === "account" && (saved'), data = renderSrc.indexOf("if (NEEDS_DATA[name]");
+  assert.ok(open > 0 && open < guard && guard < data);
+  // the saved info is for the trip picked: a new pick (answers changed) is not saved
+  assert.match(src, /function savedInfo\(\) \{[^\n]*d\.pick === st\.pick/);
+  assert.match(src, /var NEEDS_DATA = \{ into: 1, choice: 1, reveal: 1 \};/);
+  assert.ok(!/name === "done"|S\.done|done: function/.test(src), "no done screen");
+  assert.ok(!STEPS.includes("done"));
+});
+
+test("back: from the trip cards while signed in, the last question; none on the trip", () => {
+  assert.equal(Q.backStep(at("choice")), at("account"));
+  assert.match(src, /function prevStep\(step\) \{\s*var name = STEPS\[step\];\s*if \(name === "choice" && session\) return S\.heard;/);
+  assert.match(src, /backBtn\.hidden = name === "start" \|\| name === "reveal";/);
+  assert.ok(!/name === "reveal"\) \{ var o = options\(\)/.test(src), "no back from the reveal");
+});
+
+test("single option: the choice step saves it on its own, once, and not again after an error", () => {
+  assert.match(renderSrc, /if \(name === "choice"\) \{ var list = options\(\); if \(list\.length === 1 && session && !g\.busy\(\) && !acct\.error && !acct\.note\) \{ st\.pick = list\[0\]\.key; save\(\); auto = true; \} \}/);
+  assert.match(renderSrc, /painted\(name\);\s*if \(auto\) doSave\(\);/);
+  // picking a card saves it; the wait is said while it runs
+  assert.match(src, /act === "pick"\) \{ answered\("choice", v\); st\.pick = v; save\(\); doSave\(\); \}/);
+  assert.match(src, /function doSave\(\) \{[^]*?Building your trip…[^]*?\n  \}/);
+  const choice = screen("choice", "reveal");
+  assert.match(choice, /list\.length === 1 \? "1 trip fits " : list\.length \+ " trips fit "/);
+  // the error above the cards (not with the dialog, which has its own), the Replace/Keep dialog on a pick
+  assert.match(choice, /esc\(acct\.error\)/);
+  assert.match(choice, /data-act="replace">Replace it<\/button>/);
+  assert.ok(choice.indexOf("q-status") > 0 && choice.indexOf("q-status") < choice.indexOf("list.map("), "status and error above the cards");
+  assert.match(src, /var dlg = document\.getElementById\("q-dialog"\);\s*if \(dlg\) \{ dlg\.showModal\(\); document\.getElementById\("q-keep"\)\.focus\(\); \}/);
+  // a 401 on save: signed out, the account step in sign in mode; other save errors stay on the cards
+  assert.match(src, /session = null; return go\(S\.account\);/);
+  assert.match(src, /if \(session\) \{ acct\.error = [^\n]*return render\(\); \}/);
+  assert.equal((src.match(/saveFlow\(/g) || []).length, 1, "only the pick saves");
+  assert.ok(!/act === "retry"|act === "save"/.test(src));
+});
+
+test("account screen: the owner's framing, sign-in only (no save), then the trip cards", () => {
+  const acc = screen("account", "nothing");
+  assert.ok(acc.includes(`'<p class="q-kicker">Last step</p>'`));
+  assert.ok(acc.includes(`"Create your free account and we'll build your trip"`));
+  assert.ok(acc.includes(`"Sign in and we'll build your trip"`));
+  assert.ok(acc.includes(`"It'll be waiting in the Kiwi Guide app when you sign in."`));
+  assert.ok(!acc.includes("thisTrip") && !acc.includes("session") && !acc.includes("q-dialog"), "no trip, no Saving to, no dialog");
+  assert.ok(!src.includes("Save your trip") && !src.includes("Save this trip"));
+  // every sign-in ends in afterSignIn: the session, sign_up for a new account, the cards
+  assert.match(src, /function afterSignIn\(s, by\) \{\s*session = s;\s*acct\.error = acct\.note = "";[^\n]*\s*if \(s\.isNew\) track\("sign_up", \{ method: by \}\);\s*go\(S\.choice\);\s*\}/);
+  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, "email"\); \}\);/);
+  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, by\); \}\);/);
+  assert.equal((src.match(/track\("sign_up"/g) || []).length, 1);
+  // the email box's answer, for Task 3: on every acct, false to start
+  const accts = src.match(/acct = \{[^}]*\}/g);
+  assert.ok(accts.length >= 4 && accts.every((a) => a.includes("optIn: false")), accts.join("\n"));
+  // back from Google or Apple: signs in once the answers through How did you hear are in; no wait on the data or a pick
+  assert.match(src, /answersIn = firstOpenStep\(st, S\.account\) === S\.account/);
+  assert.match(src, /render\(\); if \(googlePending && answersIn\) finishGoogle\(\);/);
+  assert.match(src, /if \(googlePending && !answersIn && [^\n]*Answer the questions again\./);
+  assert.ok(!src.includes("Pick your trip again"));
+  assert.ok(!/function onLoaded\(\) \{[^}]*googlePending/.test(src));
+});
+
+test("reveal is saved: Saved to, the app's two steps and Start again before the trip; no Save button", () => {
   const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
-  const reveal = src.slice(src.indexOf("reveal: function"), src.indexOf("account: function"));
-  assert.ok(reveal.indexOf('data-act="save"') > 0 && reveal.indexOf('data-act="save"') < reveal.indexOf('<div id="tv"'), "Save before the trip");
-  assert.ok(reveal.indexOf('class="q-when"') < reveal.indexOf('data-act="save"'), "under the trip's when line, as before the trip view");
+  const reveal = screen("reveal", "account");
+  assert.ok(reveal.includes('"Saved to "'));
+  assert.ok(reveal.includes("/img/app-store-badge-black.svg"));
+  assert.ok(reveal.includes('"<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li>'));
+  assert.ok(reveal.includes('data-act="again">Start again</button>'));
+  assert.ok(!src.includes('data-act="save"'));
+  const at = reveal.indexOf('"Saved to "');
+  assert.ok(reveal.indexOf('class="q-when"') < at && at < reveal.indexOf("q-steps") && reveal.indexOf("q-steps") < reveal.indexOf('<div id="tv"'), "under the when line, before the trip");
   assert.ok(!src.includes("q-bottom") && !css.includes("q-bottom"), "no sticky bar left");
+  // saving goes to the trip, the saved info names the trip picked
+  assert.match(src, /function finish\(email, title, kept\) \{[^]*?pick: st\.pick[^]*?go\(S\.reveal\);\s*\}/);
+});
+
+test("kept: the account kept its own trip; the trip shown with a line that it wasn't saved", () => {
+  assert.ok(screen("reveal", "account").includes('"Not saved. Your account kept " + d.title + "."'));
 });
 
 test("monthsOf: each month at its next occurrence, current month included", () => {

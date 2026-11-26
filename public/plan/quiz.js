@@ -396,8 +396,8 @@ if (typeof document !== "undefined") (function () {
 
   var SAVED = "kg-saved";
   var GOOGLE = "kg-google"; // { state, nonce, provider } while the visitor is at Google or Apple; removed on return
-  // Continue with Apple only at /plan/?apple=1 until the owner's phone test passes (2026-11-26); then true for everyone
-  var APPLE_ON = false || /[?&]apple=1(&|$)/.test(location.search);
+  // Continue with Apple for everyone: owner's phone test passed, Apple's screen shows Kiwi Guide (2026-11-26)
+  var APPLE_ON = true;
   var A_MARK = '<svg width="20" height="20" viewBox="0 0 814 1000" aria-hidden="true"><path fill="currentColor" d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-156 124s-86-40-164-40c-77 0-104 41-167 41s-107-58-157-129C43 788 0 671 0 560c0-178 116-272 230-272 61 0 111 40 149 40 37 0 94-42 163-42 26 0 120 2 182 92zM554 175c28-34 49-81 49-128 0-7-1-13-2-19-46 2-101 31-134 70-26 30-50 77-50 124 0 7 1 14 2 16 3 1 8 1 12 1 41 0 93-28 123-64z"/></svg>';
   var G_MARK = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
   // Back from Google: the answer is in the address bar (#id_token=..&state=..). Take it and clear it before anything else.

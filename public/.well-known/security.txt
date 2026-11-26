@@ -1,0 +1,4 @@
+Contact: mailto:info@blacksandsdigital.nz
+Expires: 2027-11-26T00:00:00Z
+Preferred-Languages: en
+Canonical: https://kiwiguide.app/.well-known/security.txt

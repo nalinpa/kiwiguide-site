@@ -43,6 +43,12 @@ Installs per campaign are Apple's to count: App Store Connect, Analytics, Acquis
 
 `public/privacy/` and `public/terms/` were copied from https://blacksands.app/kiwi-guide on 1 Nov 2026. The app and App Store Connect still point there, so change both copies together until those links are moved here.
 
+## Files for crawlers
+
+- `public/llms.txt` describes the site for AI assistants. Its App Store link carries `ct=llms`. Keep its numbers in step with the home page.
+- `public/.well-known/security.txt` **expires 26 Nov 2027**: move the `Expires` date forward before then.
+- `public/sitemap.xml`: update a page's `<lastmod>` when the page changes.
+
 ## Run locally
 
     python -m http.server 8000 -d public

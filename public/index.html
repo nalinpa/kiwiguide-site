@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kiwi Guide: South Island road trip planner for iPhone</title>
-  <meta name="description" content="iPhone app for planning a South Island road trip in New Zealand, on the App Store. Over 500 places in about 40 towns, 26 suggested trips, a day-by-day trip planner and a travel guide with local knowledge.">
+  <meta name="description" content="Plan a South Island road trip on your iPhone: 500+ places, 26 suggested trips, a day-by-day planner and a travel guide with local knowledge. On the App Store.">
   <link rel="canonical" href="https://kiwiguide.app/">
   <meta name="theme-color" content="#095C65">
   <meta name="apple-itunes-app" content="app-id=6818057796">
@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
   <link rel="preload" href="/fonts/overpass-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/overpass-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/styles.css?v=25">
+  <link rel="stylesheet" href="/styles.css?v=32">
 
   <!-- Price is today's: update it if the app stops being free. No rating until there are real App Store ratings. -->
   <script type="application/ld+json">
@@ -49,6 +49,7 @@
   </script>
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <header class="topbar">
     <div class="wrap">
       <a class="brand" href="#"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</a>
@@ -85,7 +86,7 @@
     </div>
   </div>
 
-  <main>
+  <main id="main">
 
     <section class="wrap" aria-label="Kiwi Guide in numbers">
       <ul class="stats">
@@ -112,6 +113,19 @@
         <li><h3>A photo share card</h3><p>Put your own photo on a card with the place's name and the date, ready to post or send.</p></li>
         <li><h3>Made for iPad too</h3><p>Layouts made for the bigger screen, on iPad and on iPhone Duo.</p></li>
         <li><h3>Sign in with Apple or Google</h3><p>One tap to sign in with your Apple or Google account, or use your email.</p></li>
+      </ul>
+    </section>
+
+    <section class="wrap" aria-labelledby="why">
+      <div class="section-head">
+        <h2 id="why">Why not just a map app?</h2>
+        <p>A map app gets you from A to B. Kiwi Guide is built for the days in between.</p>
+      </div>
+      <ul class="cards feature-cards">
+        <li><h3>Works offline</h3><p>Kiwi Guide keeps working when the signal drops, and on South Island roads it will.</p></li>
+        <li><h3>A trip builder with real times</h3><p>Each day's stops are timed around opening hours and the drive between, so the plan is one you can keep.</p></li>
+        <li><h3>Made for the South Island</h3><p>Over 500 places in about 40 towns and 26 suggested trips, all for one road trip.</p></li>
+        <li><h3>Local knowledge</h3><p>One-lane bridges, sandflies and what to book ahead: the things a map won't tell you.</p></li>
       </ul>
     </section>
 
@@ -278,7 +292,8 @@
       <div class="footer-about">
         <span class="brand"><img src="/img/mark.svg" alt="" width="30" height="30"> Kiwi Guide</span>
         <p>A South Island road trip planner for iPhone, on the App Store.</p>
-        <p>Made by Black Sands Digital.</p>
+        <p id="about">Made by Nalin Patel, a developer in Auckland, at <a href="https://blacksands.app/">Black Sands Digital</a>.</p>
+        <p>Favourite spot: the Polynesian Spa pools in Rotorua. Most underrated tourist town: Whangārei.</p>
       </div>
       <nav aria-label="On this page">
         <p class="footer-h">Explore</p>
@@ -287,6 +302,7 @@
           <li><a href="#places">Places</a></li>
           <li><a href="#trips">Suggested trips</a></li>
           <li><a href="#guide">Travel guide</a></li>
+          <li><a href="#about">Who makes it</a></li>
         </ul>
       </nav>
       <div>

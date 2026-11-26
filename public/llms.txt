@@ -1,0 +1,18 @@
+# Kiwi Guide
+
+> Kiwi Guide is an iPhone and iPad app for planning a road trip around New Zealand's South Island: over 500 places in about 40 towns, 26 suggested trips, a day-by-day trip planner that times each stop around opening hours and driving, and a travel guide with local knowledge. It works offline. Made by Nalin Patel, a developer in Auckland, at Black Sands Digital.
+
+## The app
+
+- [Kiwi Guide on the App Store](https://apps.apple.com/app/apple-store/id6818057796?pt=128674950&ct=llms&mt=8): Download Kiwi Guide for iPhone and iPad.
+- [Home page](https://kiwiguide.app/): What's in the app, example places, suggested trips and a sample of the travel guide.
+- [Plan your trip](https://kiwiguide.app/plan/): Answer a few questions and get a South Island trip that fits, starting from Christchurch, Queenstown or Picton.
+
+## Legal
+
+- [Privacy policy](https://kiwiguide.app/privacy/): What Kiwi Guide collects and how it is used.
+- [Terms of service](https://kiwiguide.app/terms/): The terms for using Kiwi Guide.
+
+## Contact
+
+- [info@blacksandsdigital.nz](mailto:info@blacksandsdigital.nz): Questions about Kiwi Guide.

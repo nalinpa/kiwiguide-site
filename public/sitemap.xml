@@ -2,15 +2,18 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://kiwiguide.app/</loc>
-    <lastmod>2026-11-19</lastmod>
+    <lastmod>2026-11-26</lastmod>
   </url>
   <url>
     <loc>https://kiwiguide.app/plan/</loc>
+    <lastmod>2026-11-26</lastmod>
   </url>
   <url>
     <loc>https://kiwiguide.app/privacy/</loc>
+    <lastmod>2026-11-22</lastmod>
   </url>
   <url>
     <loc>https://kiwiguide.app/terms/</loc>
+    <lastmod>2026-11-20</lastmod>
   </url>
 </urlset>

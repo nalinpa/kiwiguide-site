@@ -55,8 +55,8 @@ function fake(script) {
 const body = tripBody(ten, "2027-01-01", uuid);
 
 test("signUp sends returnSecureToken and returns the token; errors carry the code", async () => {
-  const f = fake((u) => (u.includes("signUp") ? res(200, { idToken: "T", email: "a@b.co" }) : res(400, {})));
-  assert.deepEqual(await signUp(f, "a@b.co", "pw1234"), { idToken: "T", email: "a@b.co" });
+  const f = fake((u) => (u.includes("signUp") ? res(200, { idToken: "T", email: "a@b.co", localId: "u0" }) : res(400, {})));
+  assert.deepEqual(await signUp(f, "a@b.co", "pw1234"), { idToken: "T", email: "a@b.co", uid: "u0", isNew: true });
   assert.equal(JSON.parse(f.calls[0].opts.body).returnSecureToken, true);
   const bad = fake(() => res(400, { error: { message: "EMAIL_EXISTS" } }));
   await assert.rejects(signUp(bad, "a@b.co", "x"), (e) => e.code === "EMAIL_EXISTS");
@@ -189,8 +189,8 @@ test("a Google error (cancelled) with the right state ends with the cancel code,
 });
 
 test("signInWithGoogle posts postBody with id_token and providerId google.com, and returns the idToken", async () => {
-  const f = fake(() => res(200, { idToken: "FT", email: "g@x.co", isNewUser: true }));
-  assert.deepEqual(await signInWithGoogle(f, "G.T.K", "https://kiwiguide.app/plan/"), { idToken: "FT", email: "g@x.co", isNew: true });
+  const f = fake(() => res(200, { idToken: "FT", email: "g@x.co", localId: "u1", isNewUser: true }));
+  assert.deepEqual(await signInWithGoogle(f, "G.T.K", "https://kiwiguide.app/plan/"), { idToken: "FT", email: "g@x.co", uid: "u1", isNew: true });
   assert.match(f.calls[0].url, /accounts:signInWithIdp\?key=/);
   assert.deepEqual(JSON.parse(f.calls[0].opts.body), { postBody: "id_token=G.T.K&providerId=google.com", requestUri: "https://kiwiguide.app/plan/", returnSecureToken: true, returnIdpCredential: true });
 });
@@ -249,14 +249,53 @@ test("sha256Hex is the hex SHA-256 Apple's token carries", async () => {
 });
 
 test("Apple's return: the token's nonce must be the saved nonce's hash; Firebase gets apple.com and the nonce itself", async () => {
-  const f = fake(() => res(200, { idToken: "FT", email: "a@privaterelay.appleid.com", isNewUser: true }));
+  const f = fake(() => res(200, { idToken: "FT", email: "a@privaterelay.appleid.com", localId: "u1", isNewUser: true }));
   // the raw nonce in the token (Google's check) is refused for Apple, with no network call
   await assert.rejects(completeGoogle(f, { idToken: jwt("N1"), state: "S1" }, SAVED_A, "u"), { code: "" });
   assert.equal(f.calls.length, 0);
   const s = await completeGoogle(f, { idToken: jwt(await A.sha256Hex("N1")), state: "S1" }, SAVED_A, "https://kiwiguide.app/plan/");
-  assert.deepEqual(s, { idToken: "FT", email: "a@privaterelay.appleid.com", isNew: true });
+  assert.deepEqual(s, { idToken: "FT", email: "a@privaterelay.appleid.com", uid: "u1", isNew: true });
   const tok = jwt(await A.sha256Hex("N1"));
   assert.deepEqual(JSON.parse(f.calls[0].opts.body), { postBody: "id_token=" + tok + "&providerId=apple.com&nonce=N1", requestUri: "https://kiwiguide.app/plan/", returnSecureToken: true, returnIdpCredential: true });
   // cancelled at Apple (the worker passes it on as access_denied): the cancel code, no message
   await assert.rejects(completeGoogle(f, { error: "access_denied", state: "S1" }, SAVED_A, "u"), { code: "GOOGLE_CANCELLED" });
+});
+
+test("signUp gives uid and isNew; sign-in isNew false; signInWithIdp passes isNewUser", async () => {
+  const ok = fake(() => res(200, { idToken: "t", email: "a@b.nz", localId: "u1" }));
+  assert.deepEqual(await A.signUp(ok, "a@b.nz", "pw1234"), { idToken: "t", email: "a@b.nz", uid: "u1", isNew: true });
+  assert.deepEqual(await A.signIn(ok, "a@b.nz", "pw1234"), { idToken: "t", email: "a@b.nz", uid: "u1", isNew: false });
+  const idp = fake(() => res(200, { idToken: "t", email: "a@b.nz", localId: "u1", isNewUser: true }));
+  assert.deepEqual(await A.signInWithGoogle(idp, "g", "u"), { idToken: "t", email: "a@b.nz", uid: "u1", isNew: true });
+});
+
+test("saveEmailOptIn writes the app's record", async () => {
+  for (const value of [true, false]) {
+    const f = fake(() => res(200, {}));
+    await A.saveEmailOptIn(f, "t", "u1", value);
+    const c = f.calls[0];
+    assert.equal(c.url, "https://firestore.googleapis.com/v1/projects/southislandguide/databases/(default)/documents:commit");
+    assert.equal(c.opts.method, "POST");
+    assert.equal(c.opts.headers.Authorization, "Bearer t");
+    assert.deepEqual(JSON.parse(c.opts.body), { writes: [{ update: { name: "projects/southislandguide/databases/(default)/documents/users/u1",
+      fields: { emailOptIn: { mapValue: { fields: { value: { booleanValue: value } } } } } },
+      updateMask: { fieldPaths: ["emailOptIn.value"] },
+      updateTransforms: [{ fieldPath: "emailOptIn.at", setToServerValue: "REQUEST_TIME" }] }] });
+  }
+});
+
+test("saveEmailOptIn rejects on 403 and on a network error", async () => {
+  await assert.rejects(A.saveEmailOptIn(fake(() => res(403, {})), "t", "u1", true));
+  await assert.rejects(A.saveEmailOptIn(fake(() => { throw new TypeError("network"); }), "t", "u1", true));
+});
+
+test("the plan page CSP allows Firestore", () => {
+  const h = readFileSync(new URL("../public/_headers", import.meta.url), "utf8");
+  const conn = (path) => {
+    const block = h.split(/\r?\n(?=\S)/).find((b) => b.startsWith(path + "\n") || b.startsWith(path + "\r"));
+    return /connect-src[^;\r\n]*/.exec(block)[0];
+  };
+  assert.match(conn("/plan/*"), /https:\/\/firestore\.googleapis\.com/);
+  assert.doesNotMatch(conn("/reset/*"), /firestore/);
+  assert.doesNotMatch(h.split(/\r?\n(?=\S)/).find((b) => b.includes("/*\n") || /^\/\*\r?\n/.test(b)).match(/connect-src[^\r\n]*/)[0], /firestore/);
 });

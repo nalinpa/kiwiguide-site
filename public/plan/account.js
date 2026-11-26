@@ -33,7 +33,7 @@ function authCall(fetchFn, method, email, password) {
   }).then(function (r) {
     return r.json().then(function (data) {
       if (!r.ok) throw { code: String((data && data.error && data.error.message) || "") };
-      return { idToken: data.idToken, email: data.email };
+      return { idToken: data.idToken, email: data.email, uid: data.localId, isNew: method === "signUp" };
     });
   }, function () { throw { code: "" }; });
 }
@@ -44,6 +44,20 @@ function createAccount(fetchFn, email, password, confirm) {
   return signUp(fetchFn, email, password);
 }
 function signIn(fetchFn, email, password) { return authCall(fetchFn, "signInWithPassword", email, password); }
+
+// The app's setDoc(users/{uid}, { emailOptIn: { value, at: serverTimestamp() } }, { merge: true }) as a Firestore REST commit; the ID token is the Bearer.
+var FS_DB = "projects/southislandguide/databases/(default)";
+function saveEmailOptIn(fetchFn, idToken, uid, value) {
+  return fetchFn("https://firestore.googleapis.com/v1/" + FS_DB + "/documents:commit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
+    body: JSON.stringify({ writes: [{
+      update: { name: FS_DB + "/documents/users/" + uid, fields: { emailOptIn: { mapValue: { fields: { value: { booleanValue: !!value } } } } } },
+      updateMask: { fieldPaths: ["emailOptIn.value"] },
+      updateTransforms: [{ fieldPath: "emailOptIn.at", setToServerValue: "REQUEST_TIME" }],
+    }] }),
+  }).then(function (r) { if (!r.ok) throw { status: r.status }; }, function () { throw { status: 0 }; });
+}
 
 // Same email the app sends today.
 function resetPassword(fetchFn, email) {
@@ -117,7 +131,7 @@ function signInWithIdp(fetchFn, postBody, requestUri) {
     return r.json().then(function (data) {
       if (!r.ok) throw { code: String((data && data.error && data.error.message) || "") };
       // the email already has a password account: Firebase asks to confirm instead of linking
-      if (data.idToken && !data.needConfirmation) return { idToken: data.idToken, email: data.email, isNew: !!data.isNewUser };
+      if (data.idToken && !data.needConfirmation) return { idToken: data.idToken, email: data.email, uid: data.localId, isNew: !!data.isNewUser };
       // with returnIdpCredential Firebase answers 200 with errorMessage and no idToken
       var m = String(data.errorMessage || "").split(/[ :]/)[0];
       throw { code: data.needConfirmation || m === "EMAIL_EXISTS" || m === "FEDERATED_USER_ID_ALREADY_LINKED" ? "NEED_CONFIRMATION" : "", email: data.email };
@@ -230,4 +244,4 @@ function saveErrorMessage(status, error) {
   return "The trip could not be saved. Your account is kept. Try again.";
 }
 
-if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, GOOGLE_WEB_CLIENT_ID: GOOGLE_WEB_CLIENT_ID, googleAuthUrl: googleAuthUrl, newToken: newToken, readGoogleReturn: readGoogleReturn, signInWithGoogle: signInWithGoogle, completeGoogle: completeGoogle, APPLE_SERVICES_ID: APPLE_SERVICES_ID, appleAuthUrl: appleAuthUrl, sha256Hex: sha256Hex, signInWithApple: signInWithApple, createAccount: createAccount, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };
+if (typeof module !== "undefined") module.exports = { FIREBASE_WEB_KEY: FIREBASE_WEB_KEY, GOOGLE_WEB_CLIENT_ID: GOOGLE_WEB_CLIENT_ID, googleAuthUrl: googleAuthUrl, newToken: newToken, readGoogleReturn: readGoogleReturn, signInWithGoogle: signInWithGoogle, completeGoogle: completeGoogle, APPLE_SERVICES_ID: APPLE_SERVICES_ID, appleAuthUrl: appleAuthUrl, sha256Hex: sha256Hex, signInWithApple: signInWithApple, createAccount: createAccount, tripBody: tripBody, signUp: signUp, signIn: signIn, resetPassword: resetPassword, saveEmailOptIn: saveEmailOptIn, listTrips: listTrips, saveTrip: saveTrip, replaceTrip: replaceTrip, tripDates: tripDates, saveFlow: saveFlow, guard: guard, newestFirst: newestFirst, authErrorMessage: authErrorMessage, saveErrorMessage: saveErrorMessage };

@@ -11,13 +11,13 @@ const at = (name) => STEPS.indexOf(name);
 const full = { start: "dunedin", end: "dunedin", band: "fortnight", days: 12, season: "summer", month: { month: 0, year: 2027 }, pace: "some", drive: 240, who: "couple", age: "30-44", vibes: ["nature", "relax"], into: ["Scenic", "Walks"], food: true, activities: ["hot-pools"], heard: "google", pick: "built-dunedin-12-loop" };
 const src = readFileSync(new URL("../public/plan/quiz.js", import.meta.url), "utf8");
 
-test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities; who's travelling and age after the driving, how did you hear about us the last question; the account before the trip cards, the trip the end (owner, 2026-11-26)", () => {
-  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal"]);
+test("steps in order: the owner's order (the finish after the days), a break after the finish and after the vibe; the cards ask kinds of place and activities; who's travelling and age after the driving, how did you hear about us the last question; the account before the trip cards, the trip, then the app its own step (owner, 2026-11-26)", () => {
+  assert.deepEqual(STEPS, ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal", "done"]);
   // the progress bar grows in the order asked, every step on it
   const bar = JSON.parse(src.match(/var PROGRESS = (\{[^}]*\});/)[1].replace(/(\w+):/g, '"$1":'));
   assert.deepEqual(Object.keys(bar), STEPS);
   STEPS.forEach((s, i) => { if (i) assert.ok(bar[s] >= bar[STEPS[i - 1]], s); });
-  assert.deepEqual([bar.account, bar.choice, bar.reveal], [94, 97, 100]);
+  assert.deepEqual([bar.account, bar.choice, bar.reveal, bar.done], [94, 97, 100, 100]);
 });
 
 test("who's travelling, age and how did you hear about us: kept with the quiz answers (analytics) only, the trip the same; age and how you heard can be skipped (owner, 2026-11-24)", () => {
@@ -429,8 +429,13 @@ const screen = (name, next) => src.slice(src.indexOf("    " + name + ": function
 const renderSrc = src.slice(src.indexOf("  function render() {"), src.indexOf("  // The one-time nudge"));
 
 test("guard: no trip cards or trip without a sign-in or a save; the account step moves on once signed in or saved", () => {
-  // account: saved already, the trip; signed in, the cards
-  assert.match(renderSrc, /if \(name === "account" && \(saved \|\| session\)\) \{ location\.replace\("#" \+ \(saved \? S\.reveal : S\.choice\)\); return; \}/);
+  // account: saved already, the app step; signed in, the cards
+  assert.match(renderSrc, /if \(name === "account" && \(saved \|\| session\)\) \{ location\.replace\("#" \+ \(saved \? S\.done : S\.choice\)\); return; \}/);
+  // saved: the trip screen is behind (no second save), the app step shows; the app step without a save: the trip (its own guards then)
+  assert.match(renderSrc, /if \(name === "reveal" && saved\) \{ location\.replace\("#" \+ S\.done\); return; \}/);
+  assert.match(renderSrc, /if \(name === "done" && !saved\) \{ location\.replace\("#" \+ S\.reveal\); return; \}/);
+  const toDone = renderSrc.indexOf('if (name === "reveal" && saved)'), noSession = renderSrc.indexOf('if ((name === "choice" && !session)');
+  assert.ok(toDone > 0 && toDone < noSession, "a saved trip goes to done before the sign-in check");
   // choice with no session, and the trip with neither a session (not saved yet) nor a save: the account (a reload loses the sign-in)
   assert.match(renderSrc, /if \(\(name === "choice" && !session\) \|\| \(name === "reveal" && !saved && !session\)\) \{ location\.replace\("#" \+ S\.account\); return; \}/);
   assert.match(renderSrc, /, saved = savedInfo\(\);/);
@@ -449,23 +454,22 @@ test("guard: no trip cards or trip without a sign-in or a save; the account step
   const clear = renderSrc.indexOf('shown !== "reveal"');
   assert.ok(renderSrc.indexOf('if ((name === "choice" && !session)') < clear && clear < renderSrc.indexOf("if (NEEDS_DATA[name]"), "after the guards, before the wait screen");
   assert.match(src, /function painted\(name\) \{\s*shown = name;/);
+  // the app step needs no data: the saved info names the trip
   assert.match(src, /var NEEDS_DATA = \{ into: 1, choice: 1, reveal: 1 \};/);
-  assert.ok(!/name === "done"|S\.done|done: function/.test(src), "no done screen");
-  assert.ok(!STEPS.includes("done"));
 });
 
-test("back: from the trip cards while signed in, the last question; on the trip until it is saved", () => {
+test("back: from the trip cards while signed in, the last question; always on the trip, never on the app step", () => {
   assert.equal(Q.backStep(at("choice")), at("account"));
   assert.match(src, /function prevStep\(step\) \{\s*var name = STEPS\[step\];/);
   assert.match(src, /if \(name === "choice" && session\) return S\.heard;/);
   // the trip goes back to the cards, or past them with one trip (it would only show again); signed in, past the account too
   assert.match(src, /if \(name === "reveal"\) \{ var o = options\(\); return typeof o !== "string" && o\.length === 1 \? prevStep\(S\.choice\) : S\.choice; \}/);
   assert.ok(src.indexOf('if (name === "reveal") { var o') < src.indexOf('if (name === "choice" && session)'));
-  assert.match(src, /backBtn\.hidden = name === "start" \|\| \(name === "reveal" && !!savedInfo\(\)\);/);
+  assert.match(src, /backBtn\.hidden = name === "start" \|\| name === "done";/);
 });
 
 // Owner, 2026-11-26: "they can save by clicking a button. it doesnt have to auto save"
-test("picking a trip shows it, one trip shows on its own; nothing saves until Save this trip", () => {
+test("picking a trip shows it, one trip shows on its own; nothing saves until Save and open in the app", () => {
   assert.match(renderSrc, /if \(name === "choice"\) \{ var list = options\(\); if \(list\.length === 1\) \{ st\.pick = list\[0\]\.key; save\(\); location\.replace\("#" \+ S\.reveal\); return; \} \}/);
   assert.ok(!/\bauto\b/.test(renderSrc), "no auto-save left in render");
   assert.match(src, /act === "pick"\) \{ answered\("choice", v\); st\.pick = v; save\(\); go\(S\.reveal\); \}/);
@@ -477,9 +481,9 @@ test("picking a trip shows it, one trip shows on its own; nothing saves until Sa
   const choice = screen("choice", "reveal");
   assert.match(choice, /list\.length === 1 \? "1 trip fits " : list\.length \+ " trips fit "/);
   assert.ok(!/acct\.|q-status|q-err|q-dialog|session/.test(choice), "no save state on the cards");
-  // the trip, not saved: the Save button, its status and error, the Replace/Keep dialog
-  const reveal = screen("reveal", "account");
-  assert.match(reveal, /if \(!d && session && acct\.note === "has-trip"\) \{/);
+  // the trip (never saved: render sends a saved one to done): the button, its status and error, the Replace/Keep dialog
+  const reveal = screen("reveal", "done");
+  assert.match(reveal, /if \(session && acct\.note === "has-trip"\) \{/);
   assert.match(reveal, /data-act="replace">Replace it<\/button>/);
   assert.match(reveal, /esc\(acct\.error\)/);
   assert.ok(reveal.includes('id="q-status" role="status"') && reveal.includes('id="q-err" role="alert"'));
@@ -487,7 +491,8 @@ test("picking a trip shows it, one trip shows on its own; nothing saves until Sa
   // a 401 on save: signed out, the account step in sign in mode; other save errors stay on the trip, the button again
   assert.match(src, /session = null; return go\(S\.account\);/);
   assert.match(src, /if \(session\) \{ acct\.error = [^\n]*return render\(\); \}/);
-  assert.ok(reveal.includes('(acct.error ? "Try again" : "Save this trip")'));
+  assert.ok(reveal.includes('<button type="button" class="q-cta" data-act="save">\' + (acct.error ? "Try again" : "Save and open in the app")'));
+  assert.ok(!src.includes("Save this trip"));
   assert.equal((src.match(/saveFlow\(/g) || []).length, 1, "only the button saves");
 });
 
@@ -515,25 +520,42 @@ test("account screen: the owner's framing, sign-in only (no save), then the trip
   assert.ok(!/function onLoaded\(\) \{[^}]*googlePending/.test(src));
 });
 
-test("reveal: saved, Saved to and the app's two steps; not saved, the Save button; Start again, all before the trip", () => {
+// Owner, 2026-11-26: "this is a separate step... ie show them the trip with a button to get the app / view / save in app"
+test("reveal: only the trip, one button at the top (Save and open in the app); no Saved to, no App Store; Start again at the bottom", () => {
   const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
-  const reveal = screen("reveal", "account");
-  assert.ok(reveal.includes('"Saved to "'));
-  assert.ok(reveal.includes("/img/app-store-badge-black.svg"));
-  assert.ok(reveal.includes('"<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li>'));
-  assert.ok(reveal.includes('data-act="again">Start again</button>'));
-  // saved: the lead and the steps; else (not saved) the button, never both
-  assert.match(reveal, /\(d \? '<p class="q-lead">'[^]*?<\/span><\/li><\/ol>"\s*: '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">'/);
+  const reveal = screen("reveal", "done");
+  assert.ok(!reveal.includes("Saved to "), "no Saved to line");
+  assert.ok(!reveal.includes("app-store-badge") && !reveal.includes("q-steps") && !reveal.includes("savedInfo"), "no App Store steps, no saved state");
   assert.equal((src.match(/data-act="save"/g) || []).length, 1);
-  const at = reveal.indexOf('"Saved to "'), btn = reveal.indexOf('data-act="save"');
-  assert.ok(reveal.indexOf('class="q-when"') < at && at < reveal.indexOf("q-steps") && reveal.indexOf("q-steps") < btn && btn < reveal.indexOf('<div id="tv"'), "under the when line, before the trip");
+  const btn = reveal.indexOf('data-act="save"'), tvAt = reveal.indexOf('<div id="tv"'), again = reveal.indexOf('data-act="again">Start again</button>');
+  assert.ok(reveal.indexOf('class="q-when"') < btn && btn < tvAt, "under the when line, before the trip");
+  assert.ok(tvAt < reveal.indexOf("+ notes") && reveal.indexOf("+ notes") < again, "Start again after the trip view and the notes");
+  assert.ok(again > reveal.indexOf("q-season"), "at the bottom");
+  // no blank gap under the button: the empty status and error lines take no space, the live regions stay
+  assert.ok(reveal.includes('id="q-status" role="status"') && reveal.includes('id="q-err" role="alert"'));
+  assert.match(css, /\.q-status:empty, \.q-main > \.q-error:empty \{ margin: -6px 0; min-height: 0; \}/);
   assert.ok(!src.includes("q-bottom") && !css.includes("q-bottom"), "no sticky bar left");
-  // saving goes to the trip, the saved info names the trip picked
-  assert.match(src, /function finish\(email, title, kept\) \{[^]*?pick: st\.pick[^]*?go\(S\.reveal\);\s*\}/);
+  // saving goes to the app step, the saved info names the trip picked
+  assert.match(src, /function finish\(email, title, kept\) \{[^]*?pick: st\.pick[^]*?go\(S\.done\);\s*\}/);
 });
 
-test("kept: the account kept its own trip; the trip shown with a line that it wasn't saved", () => {
-  assert.ok(screen("reveal", "account").includes('"Not saved. Your account kept " + d.title + "."'));
+test("done: its own screen, the old look (tick, heading, the trip's name, the app's two steps, Start again); kept says so", () => {
+  const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
+  const done = screen("done", "account");
+  assert.match(done, /var d = savedInfo\(\);/);
+  assert.ok(done.includes('<div class="q-done"><div class="q-tick"><svg'));
+  assert.ok(done.includes('(d.kept ? "Your trip is unchanged" : "Your trip is saved")'));
+  // the trip's name under the heading; kept, the line that names the account's own trip in its place
+  assert.ok(done.includes('<p class="q-lead">\' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : d.title) + "</p>"'));
+  assert.ok(done.includes('<a class="badge" href="\' + APP + \'"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store"'));
+  assert.ok(done.includes('"<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li>'));
+  assert.ok(done.includes('data-act="again">Start again</button>'));
+  const h = done.indexOf("Your trip is saved"), one = done.indexOf("<b>1</b>"), two = done.indexOf("<b>2</b>"), again = done.indexOf("Start again");
+  assert.ok(h < one && one < two && two < again);
+  assert.match(css, /\.q-done \{/);
+  assert.match(css, /\.q-tick \{/);
+  // the App Store tap is still measured
+  assert.match(src, /if \(e\.target\.closest\("a\.badge"\)\) track\("app_store_click", \{ trip: st\.pick \}\);/);
 });
 
 test("monthsOf: each month at its next occurrence, current month included", () => {
@@ -571,7 +593,9 @@ test("stepFromHash", () => {
   assert.equal(stepFromHash(""), 0);
   assert.equal(stepFromHash("#x"), 0);
   assert.equal(stepFromHash("#99"), 0);
-  assert.equal(stepFromHash("#19"), STEPS.indexOf("reveal"));
+  assert.equal(stepFromHash("#19"), STEPS.indexOf("done"));
+  assert.equal(stepFromHash("#20"), 0);
+  assert.ok(!src.includes("old done screen"), "no #19 mapping left");
   assert.equal(stepFromHash("#-1"), 0);
 });
 

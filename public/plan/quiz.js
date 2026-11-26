@@ -14,7 +14,7 @@ var TOWNS = [
   { id: "invercargill", out: "Fly out of Invercargill", name: "Invercargill", sub: "The far south: Bluff, the Catlins and Fiordland.", fact: "Friendly and unhurried and your way in to Bluff, the Catlins and the ferry across to Stewart Island.", img: PHOTO + "a2f24963-ec1c-4a10-a50c-31733b302595.webp", more: true },
 ];
 
-var STEPS = ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal"];
+var STEPS = ["start", "band", "days", "finish", "break1", "season", "month", "pace", "drive", "who", "age", "vibe", "break2", "into", "food", "heard", "account", "choice", "reveal", "done"];
 
 // "How long have you got?", the first quiz's rough lengths: each opens the days picker on its top number (2 to 21 days).
 var BANDS = [
@@ -362,7 +362,6 @@ function driveLine(minutes, limit) {
 
 function stepFromHash(hash) {
   var n = parseInt(String(hash).replace("#", ""), 10);
-  if (n === 19) return STEPS.indexOf("reveal"); // old done screen
   return n >= 0 && n < STEPS.length ? n : 0;
 }
 
@@ -377,7 +376,7 @@ if (typeof document !== "undefined") (function () {
   var root = document.getElementById("q");
   var bar = document.getElementById("bar");
   var backBtn = document.getElementById("back");
-  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, account: 94, choice: 97, reveal: 100 };
+  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, account: 94, choice: 97, reveal: 100, done: 100 };
   var S = {}; STEPS.forEach(function (n, i) { S[n] = i; });
   var NEEDS_DATA = { into: 1, choice: 1, reveal: 1 };
   var CHIPS = [3, 5, 7, 10, 12, 14, 17, 21];
@@ -512,7 +511,7 @@ if (typeof document !== "undefined") (function () {
 
   function prevStep(step) {
     var name = STEPS[step];
-    // the trip (back only shows before it is saved): to the cards, or past them with one trip, which would only show again
+    // the trip (never shown once saved): to the cards, or past them with one trip, which would only show again
     if (name === "reveal") { var o = options(); return typeof o !== "string" && o.length === 1 ? prevStep(S.choice) : S.choice; }
     if (name === "choice" && session) return S.heard; // signed in: the account step would only send the visitor back here
     if (name === "pace") return st.season && st.season !== "unsure" ? S.month : S.season;
@@ -647,11 +646,11 @@ if (typeof document !== "undefined") (function () {
             '<span class="q-trip-text"><b class="q-badge ' + (built ? "q-built" : "q-sugg") + '">' + (built ? "Built for you" : "Hand-checked trip") + "</b><strong>" + esc(t.label) + "</strong><span>" + esc(routeLine(t)) + "</span><em>" + days(t.days.length) + " · " + esc(endLabel(t)) + "</em></span></button>";
         }).join("");
     },
-    // The end: the trip, with Save this trip until it is saved (or, on Keep, the account's own trip kept), then how to open it in the app
+    // The trip, with one button: Save and open in the app (owner, 2026-11-26). Never saved here: render sends a saved one to done.
     reveal: function () {
-      var t = thisTrip(), d = savedInfo(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities, dialog = "";
-      // not saved yet, and the account has a trip of its own: Replace or Keep
-      if (!d && session && acct.note === "has-trip") {
+      var t = thisTrip(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities, dialog = "";
+      // the account has a trip of its own: Replace or Keep
+      if (session && acct.note === "has-trip") {
         var x = acct.existing, dt = tripDates(x.startDate, x.endDate);
         dialog = '<dialog class="q-dialog" id="q-dialog" aria-labelledby="q-dlg-h"><h2 id="q-dlg-h">Your account already has a trip</h2><p>This will replace your current trip.</p>' +
           '<p class="q-small">' + esc((x.title || "Your trip") + (dt ? " · " + dt : "")) + '</p><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
@@ -667,18 +666,24 @@ if (typeof document !== "undefined") (function () {
       if (tv.pick !== st.pick) tv = { pick: st.pick, view: "trip", day: tv.day }; // another trip opens on Trip; the open day stays if it has one (paintTrip clamps it)
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when"><b>From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + '</b><br><span class="q-nb">' + days(t.days.length) + (w ? " · " + w : "") + ".</span> Change the dates in the app.</p>" +
-        // saved, and the app's two steps; not saved, the button (the dialog's own error line stands in while it is up). At the
-        // top, before the trip (the owner, 2026-11-23 and 2026-11-26)
-        (d ? '<p class="q-lead">' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : "Saved to " + d.email) + "</p>" +
-          '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
-          "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>"
-          : '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">' + (acct.error ? "Try again" : "Save this trip") + "</button></div>" +
-          '<p class="q-status" id="q-status" role="status"></p>' + (dialog ? "" : '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>")) +
-        '<div class="q-actions q-stack"><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' +
+        // the button at the top, before the trip (the owner, 2026-11-23 and 2026-11-26); its status and error lines take no
+        // space while empty (styles.css); the dialog's own error line stands in while it is up
+        '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">' + (acct.error ? "Try again" : "Save and open in the app") + "</button></div>" +
+        '<p class="q-status" id="q-status" role="status"></p>' + (dialog ? "" : '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>") +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
         (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
         '<div id="tv" class="q-days tv"></div>' + notes +
-        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") + dialog;
+        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") +
+        '<div class="q-actions q-stack"><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' + dialog;
+    },
+    // Saved (or kept): the app is its own step (owner, 2026-11-26), with no Back
+    done: function () {
+      var d = savedInfo();
+      return '<div class="q-done"><div class="q-tick"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+        '<h1 tabindex="-1">' + (d.kept ? "Your trip is unchanged" : "Your trip is saved") + '</h1><p class="q-lead">' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : d.title) + "</p>" +
+        '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
+        "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>" +
+        '<button type="button" class="q-again" data-act="again">Start again</button></div>';
     },
     // The account before any trip shows (owner, 2026-11-26): sign in only; the trip's Save button saves it
     account: function () {
@@ -710,7 +715,10 @@ if (typeof document !== "undefined") (function () {
     var ok = firstOpenStep(st, step), saved = savedInfo();
     if (ok !== step) { location.replace("#" + ok); return; }
     // no trip cards without a sign-in, and no trip without a sign-in or a save (a reload loses the sign-in: tokens are never stored)
-    if (name === "account" && (saved || session)) { location.replace("#" + (saved ? S.reveal : S.choice)); return; }
+    if (name === "account" && (saved || session)) { location.replace("#" + (saved ? S.done : S.choice)); return; }
+    // saved: the app step, never the trip again (no second save); the app step needs the save
+    if (name === "reveal" && saved) { location.replace("#" + S.done); return; }
+    if (name === "done" && !saved) { location.replace("#" + S.reveal); return; }
     if ((name === "choice" && !session) || (name === "reveal" && !saved && !session)) { location.replace("#" + S.account); return; }
     if (name === "reveal" && shown !== "reveal" && !g.busy()) { acct.error = acct.note = ""; acct.existing = null; }
     if (NEEDS_DATA[name] && load.status !== "ready") {
@@ -823,7 +831,7 @@ if (typeof document !== "undefined") (function () {
     shown = name;
     bar.style.width = PROGRESS[name] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[name]);
-    backBtn.hidden = name === "start" || (name === "reveal" && !!savedInfo());
+    backBtn.hidden = name === "start" || name === "done";
     document.body.classList.toggle("q-photo", !!root.querySelector(".q-brk:not(.q-brk-card)"));
     if (notice) { root.insertAdjacentHTML("afterbegin", '<p class="q-error" role="alert">' + esc(notice) + "</p>"); notice = ""; }
     root.scrollTop = 0;
@@ -935,7 +943,7 @@ if (typeof document !== "undefined") (function () {
     savedMem = { email: email, title: title, kept: !!kept, pick: st.pick };
     try { sessionStorage.setItem(SAVED, JSON.stringify(savedMem)); } catch (e) { /* the copy in memory shows it this time */ }
     session = null;
-    go(S.reveal);
+    go(S.done);
   }
 
   // Every failure ends in a re-render or a re-enabled form, never a stuck disabled button.
@@ -1005,7 +1013,7 @@ if (typeof document !== "undefined") (function () {
     }, function (s) { afterSignIn(s, "email", acct.optIn); });
   });
 
-  // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until Save this trip.
+  // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until the trip's button.
   function afterSignIn(s, by, optIn) {
     session = s;
     if (s.isNew) {

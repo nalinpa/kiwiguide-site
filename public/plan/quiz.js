@@ -681,7 +681,8 @@ if (typeof document !== "undefined") (function () {
       var title = mode === "forgot" ? "Reset your password" : mode === "signin" ? "Sign in and we'll build your trip" : "Create your free account and we'll build your trip";
       var lead = mode === "forgot" ? "We will email you a link to choose a new password." : mode === "signin" ? "Use your Kiwi Guide account." : "It'll be waiting in the Kiwi Guide app when you sign in.";
       var dby = ' aria-describedby="q-err"';
-      var google = mode === "forgot" ? "" : (APPLE_ON ? '<button type="button" class="q-apple" data-act="apple">' + A_MARK + "<span>Continue with Apple</span></button>" : "") +
+      var box = mode === "create" ? '<label class="q-optin"><input type="checkbox" id="q-optin"' + (acct.optIn ? " checked" : "") + "><span>Email me now and then to ask for feedback and share Kiwi Guide news</span></label>" : "";
+      var google = mode === "forgot" ? "" : box + (APPLE_ON ? '<button type="button" class="q-apple" data-act="apple">' + A_MARK + "<span>Continue with Apple</span></button>" : "") +
         '<button type="button" class="q-google" data-act="google">' + G_MARK + "<span>Continue with Google</span></button>" + '<p class="q-or"><span>or use your email</span></p>';
       return kicker + '<h1 tabindex="-1">' + title + '</h1><p class="q-lead">' + lead + '</p><p class="q-status" id="q-status" role="status"></p>' + google +
         '<form id="q-form" class="q-form" novalidate><label>Email<input id="q-email" type="email" name="email" autocomplete="email" inputmode="email" required' + dby + "></label>" +
@@ -843,6 +844,7 @@ if (typeof document !== "undefined") (function () {
     });
   }
   root.addEventListener("input", function (e) { if (e.target.id === "q-range") setDays(+e.target.value); });
+  root.addEventListener("change", function (e) { if (e.target.id === "q-optin") acct.optIn = e.target.checked; });
   // A row photo that fails (a dead thumb) becomes the free day's pin, not an empty frame. Error events don't bubble, so this
   // listens on the way down; the CSP allows no inline onerror.
   root.addEventListener("error", function (e) { if (e.target.matches("img.tv-pic")) e.target.outerHTML = TripView.nopic; }, true);
@@ -994,34 +996,37 @@ if (typeof document !== "undefined") (function () {
     }
     run(function () {
       return acct.mode === "signin" ? signIn(net, email, passEl.value) : createAccount(net, email, passEl.value, document.getElementById("q-pass2").value);
-    }, function (s) { afterSignIn(s, "email"); });
+    }, function (s) { afterSignIn(s, "email", acct.optIn); });
   });
 
   // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until a trip is picked.
-  function afterSignIn(s, by) {
+  function afterSignIn(s, by, optIn) {
     session = s;
-    if (s.isNew) track("sign_up", { method: by });
+    if (s.isNew) {
+      track("sign_up", { method: by });
+      saveEmailOptIn(fetch.bind(window), s.idToken, s.uid, optIn).catch(function () {}); // yes or no is recorded; never awaited, never blocks
+    }
     go(S.choice);
   }
 
   // Off to Google. The state and nonce wait in sessionStorage (the quiz answers already do); the tokens never do.
   function goGoogle() {
     var state = newToken(), nonce = newToken();
-    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce })); } catch (e) { return setErr(authErrorMessage("")); }
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, optIn: acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
     location.assign(googleAuthUrl(location.origin, state, nonce));
   }
   // Off to Apple, the same way; Apple gets the nonce's hash (Firebase checks it against the nonce itself).
   function goApple() {
     var state = newToken(), nonce = newToken();
-    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple" })); } catch (e) { return setErr(authErrorMessage("")); }
+    try { sessionStorage.setItem(GOOGLE, JSON.stringify({ state: state, nonce: nonce, provider: "apple", optIn: acct.optIn })); } catch (e) { return setErr(authErrorMessage("")); }
     sha256Hex(nonce).then(function (h) { location.assign(appleAuthUrl(location.origin, state, h)); }, function () { setErr(authErrorMessage("")); });
   }
   // The visitor is back from Google or Apple: sign in with its answer, then on as for email.
   function finishGoogle() {
-    var net = fetch.bind(window), r = gret, sv = gsaved, by = sv && sv.provider === "apple" ? "apple" : "google";
+    var net = fetch.bind(window), r = gret, sv = gsaved, by = sv && sv.provider === "apple" ? "apple" : "google", optIn = sv && sv.optIn === true;
     gret = gsaved = null;
     var sb = document.getElementById("q-status"); if (sb) sb.textContent = "Signing in with " + (by === "apple" ? "Apple" : "Google") + "…"; // render left it empty, so the change is announced; fail() clears it
-    run(function () { return completeGoogle(net, r, sv, location.origin + "/plan/"); }, function (s) { afterSignIn(s, by); });
+    run(function () { return completeGoogle(net, r, sv, location.origin + "/plan/"); }, function (s) { afterSignIn(s, by, optIn); });
   }
 
   backBtn.addEventListener("click", function () {

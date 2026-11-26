@@ -676,3 +676,6 @@ button.q-cta:disabled { opacity: 0.6; cursor: default; }
   .q-main:has(> .q-form) { width: 100%; max-width: 520px; margin-inline: auto; }
 }
 @media (min-width: 1024px) and (prefers-color-scheme: light) { .tv-row[aria-current="true"] .tv-over { color: var(--tv-text); } }
+.q-optin { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 1rem; line-height: 1.35; cursor: pointer; }
+.q-optin input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--accent); }
+.q-optin input:focus-visible { outline: 3px solid var(--kiwi); outline-offset: 2px; }

@@ -489,9 +489,9 @@ test("account screen: the owner's framing, sign-in only (no save), then the trip
   assert.ok(!acc.includes("thisTrip") && !acc.includes("session") && !acc.includes("q-dialog"), "no trip, no Saving to, no dialog");
   assert.ok(!src.includes("Save your trip") && !src.includes("Save this trip"));
   // every sign-in ends in afterSignIn: the session, sign_up for a new account, the cards
-  assert.match(src, /function afterSignIn\(s, by\) \{\s*session = s;\s*if \(s\.isNew\) track\("sign_up", \{ method: by \}\);\s*go\(S\.choice\);\s*\}/);
-  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, "email"\); \}\);/);
-  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, by\); \}\);/);
+  assert.match(src, /function afterSignIn\(s, by, optIn\) \{\s*session = s;\s*if \(s\.isNew\) \{\s*track\("sign_up", \{ method: by \}\);\s*saveEmailOptIn\(fetch\.bind\(window\), s\.idToken, s\.uid, optIn\)\.catch\(function \(\) \{\}\);[^\n]*\s*\}\s*go\(S\.choice\);\s*\}/);
+  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, "email", acct\.optIn\); \}\);/);
+  assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, by, optIn\); \}\);/);
   assert.equal((src.match(/track\("sign_up"/g) || []).length, 1);
   // the email box's answer, for Task 3: on every acct, false to start
   const accts = src.match(/acct = \{[^}]*\}/g);
@@ -598,4 +598,18 @@ test("driveLine: the over-limit line", () => {
   assert.equal(Q.driveLine(320, 240), "About 5 h 20 of driving. Over your 4 h limit.");
   assert.equal(Q.driveLine(300, 120), "About 5 h of driving. Over your 2 h limit.");
   assert.equal(Q.driveLine(185, 120), "About 3 h 05 of driving. Over your 2 h limit.");
+});
+
+test("email box: markup, state, round trip through Google/Apple", () => {
+  const acc = screen("account", "nothing");
+  assert.ok(acc.includes('<label class="q-optin"><input type="checkbox" id="q-optin"'));
+  assert.ok(acc.includes("Email me now and then to ask for feedback and share Kiwi Guide news"));
+  assert.match(acc, /\(acct\.optIn \? " checked" : ""\)/);
+  assert.ok(acc.indexOf("q-optin") < acc.indexOf('data-act="apple"'), "above Apple");
+  assert.match(acc, /mode === "create" \? '<label class="q-optin">/, "create mode only");
+  assert.match(src, /root\.addEventListener\("change", function \(e\) \{ if \(e\.target\.id === "q-optin"\) acct\.optIn = e\.target\.checked; \}\);/);
+  assert.match(src, /acct\.mode = v; acct\.error = ""; render\(\);/);
+  assert.match(src, /act === "again"[^\n]*optIn: false/);
+  assert.equal((src.match(/optIn: acct\.optIn/g) || []).length, 2, "goGoogle and goApple store the tick");
+  assert.match(src, /optIn = sv && sv\.optIn === true/);
 });

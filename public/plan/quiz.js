@@ -415,7 +415,7 @@ if (typeof document !== "undefined") (function () {
   // The trip saved (or kept) for the trip picked: { email, title, kept, pick }. A copy in memory for when sessionStorage is off.
   var savedMem = null;
   function savedInfo() { var d = savedMem; if (!d) try { d = JSON.parse(sessionStorage.getItem(SAVED)); } catch (e) { /* none */ } return d && typeof d.email === "string" && typeof d.title === "string" && d.pick && d.pick === st.pick ? d : null; }
-  var shown = ""; // the step last painted: a re-render of the cards (after a save) keeps its error and dialog, coming back doesn't
+  var shown = ""; // the step last painted: a re-render of the trip (after a save) keeps its error and dialog, coming back doesn't
 
   // The builder's data and pack.js load once the first answer is in (or straight away on a reload mid-quiz).
   var load = { status: "idle" };
@@ -512,6 +512,8 @@ if (typeof document !== "undefined") (function () {
 
   function prevStep(step) {
     var name = STEPS[step];
+    // the trip (back only shows before it is saved): to the cards, or past them with one trip, which would only show again
+    if (name === "reveal") { var o = options(); return typeof o !== "string" && o.length === 1 ? prevStep(S.choice) : S.choice; }
     if (name === "choice" && session) return S.heard; // signed in: the account step would only send the visitor back here
     if (name === "pace") return st.season && st.season !== "unsure" ? S.month : S.season;
     return backStep(step);
@@ -635,26 +637,26 @@ if (typeof document !== "undefined") (function () {
         HEARD.map(function (h) { return choice(h.label, "", "heard", h.id, st.heard === h.id); }).join("") +
         '<button type="button" class="q-cta q-next" data-act="heard" data-val="skip">Skip</button>';
     },
-    // Picking a trip saves it (one trip: render saves it on its own). The account's own trip asks Replace or Keep here.
+    // Picking a trip shows it (one trip: render shows it on its own); nothing is saved here.
     choice: function () {
-      var list = options(), photos = tripPhotos(list), dialog = "";
-      if (session && acct.note === "has-trip") {
+      var list = options(), photos = tripPhotos(list);
+      return '<p class="q-kicker">' + (list.length === 1 ? "1 trip fits " : list.length + " trips fit ") + (st.end === st.start ? town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
+        list.map(function (t, n) {
+          var built = t.kind === "built";
+          return '<button type="button" class="q-trip" data-act="pick" data-val="' + esc(t.key) + '">' + (photos[n] ? '<img src="' + esc(photos[n]) + '" alt="" width="640" height="240">' : "") +
+            '<span class="q-trip-text"><b class="q-badge ' + (built ? "q-built" : "q-sugg") + '">' + (built ? "Built for you" : "Hand-checked trip") + "</b><strong>" + esc(t.label) + "</strong><span>" + esc(routeLine(t)) + "</span><em>" + days(t.days.length) + " · " + esc(endLabel(t)) + "</em></span></button>";
+        }).join("");
+    },
+    // The end: the trip, with Save this trip until it is saved (or, on Keep, the account's own trip kept), then how to open it in the app
+    reveal: function () {
+      var t = thisTrip(), d = savedInfo(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities, dialog = "";
+      // not saved yet, and the account has a trip of its own: Replace or Keep
+      if (!d && session && acct.note === "has-trip") {
         var x = acct.existing, dt = tripDates(x.startDate, x.endDate);
         dialog = '<dialog class="q-dialog" id="q-dialog" aria-labelledby="q-dlg-h"><h2 id="q-dlg-h">Your account already has a trip</h2><p>This will replace your current trip.</p>' +
           '<p class="q-small">' + esc((x.title || "Your trip") + (dt ? " · " + dt : "")) + '</p><p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" +
           '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="replace">Replace it</button><button type="button" class="q-again" id="q-keep" data-act="keep" autofocus>Keep my trip</button></div></dialog>';
       }
-      return '<p class="q-kicker">' + (list.length === 1 ? "1 trip fits " : list.length + " trips fit ") + (st.end === st.start ? town(st.start).name + " and back" : town(st.start).name + " to " + town(st.end).name) + " · " + days(st.days) + '</p><h1 tabindex="-1">Which one sounds like you?</h1>' +
-        '<p class="q-status" id="q-status" role="status"></p>' + (acct.error && !dialog ? '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>" : "") +
-        list.map(function (t, n) {
-          var built = t.kind === "built";
-          return '<button type="button" class="q-trip" data-act="pick" data-val="' + esc(t.key) + '">' + (photos[n] ? '<img src="' + esc(photos[n]) + '" alt="" width="640" height="240">' : "") +
-            '<span class="q-trip-text"><b class="q-badge ' + (built ? "q-built" : "q-sugg") + '">' + (built ? "Built for you" : "Hand-checked trip") + "</b><strong>" + esc(t.label) + "</strong><span>" + esc(routeLine(t)) + "</span><em>" + days(t.days.length) + " · " + esc(endLabel(t)) + "</em></span></button>";
-        }).join("") + dialog;
-    },
-    // The end: the trip, saved (or, on Keep, the account's own trip kept), and how to open it in the app
-    reveal: function () {
-      var t = thisTrip(), d = savedInfo(), w = whenLabel(), sline = seasonLine(st.season), acts = st.activities;
       var missing = t.missing.map(function (a) { return labelOf(ACTIVITIES, a).toLowerCase(); });
       // Where each picked activity is: one line per activity, naming its places and days, after the trip (so Day 1 is on a phone's first screen).
       var notes = acts.map(function (a) {
@@ -665,17 +667,20 @@ if (typeof document !== "undefined") (function () {
       if (tv.pick !== st.pick) tv = { pick: st.pick, view: "trip", day: tv.day }; // another trip opens on Trip; the open day stays if it has one (paintTrip clamps it)
       return '<p class="q-kicker">Your trip</p><h1 tabindex="-1">' + esc(t.label) + "</h1>" +
         '<p class="q-when"><b>From ' + esc(areaName(t.start)) + (t.end === t.start ? " and back" : " to " + esc(areaName(t.end))) + '</b><br><span class="q-nb">' + days(t.days.length) + (w ? " · " + w : "") + ".</span> Change the dates in the app.</p>" +
-        // saved, and the app's two steps, at the top, before the trip (the owner, 2026-11-23 and 2026-11-26)
-        '<p class="q-lead">' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : "Saved to " + d.email) + "</p>" +
-        '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
-        "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>" +
+        // saved, and the app's two steps; not saved, the button (the dialog's own error line stands in while it is up). At the
+        // top, before the trip (the owner, 2026-11-23 and 2026-11-26)
+        (d ? '<p class="q-lead">' + esc(d.kept ? "Not saved. Your account kept " + d.title + "." : "Saved to " + d.email) + "</p>" +
+          '<ol class="q-steps"><li><b>1</b><span>Get Kiwi Guide<a class="badge" href="' + APP + '"><img src="/img/app-store-badge-black.svg" alt="Download Kiwi Guide on the App Store" width="162" height="54"></a></span></li>' +
+          "<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li></ol>"
+          : '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">' + (acct.error ? "Try again" : "Save this trip") + "</button></div>" +
+          '<p class="q-status" id="q-status" role="status"></p>' + (dialog ? "" : '<p class="q-error" id="q-err" role="alert">' + esc(acct.error) + "</p>")) +
         '<div class="q-actions q-stack"><button type="button" class="q-link q-restart" data-act="again">Start again</button></div>' +
         '<p class="q-match">' + esc(summaryLine(t, st)) + "</p>" +
         (missing.length ? '<p class="q-miss">Nothing for ' + esc(and(missing, "or")) + " on this route.</p>" : "") +
         '<div id="tv" class="q-days tv"></div>' + notes +
-        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "");
+        (sline ? '<p class="q-season">' + esc(sline) + "</p>" : "") + dialog;
     },
-    // The account before any trip shows (owner, 2026-11-26): sign in only; the trip is saved when it is picked
+    // The account before any trip shows (owner, 2026-11-26): sign in only; the trip's Save button saves it
     account: function () {
       var kicker = '<p class="q-kicker">Last step</p>';
       var mode = acct.mode;
@@ -702,19 +707,19 @@ if (typeof document !== "undefined") (function () {
     removeKeys();
     stopHint();
     var step = stepFromHash(location.hash), name = STEPS[step];
-    var ok = firstOpenStep(st, step), saved = savedInfo(), auto = false;
+    var ok = firstOpenStep(st, step), saved = savedInfo();
     if (ok !== step) { location.replace("#" + ok); return; }
-    // no trip cards without a sign-in, and no trip that isn't saved (a reload loses the sign-in: tokens are never stored)
+    // no trip cards without a sign-in, and no trip without a sign-in or a save (a reload loses the sign-in: tokens are never stored)
     if (name === "account" && (saved || session)) { location.replace("#" + (saved ? S.reveal : S.choice)); return; }
-    if ((name === "choice" && !session) || (name === "reveal" && !saved)) { location.replace("#" + (session ? S.choice : S.account)); return; }
-    if (name === "choice" && shown !== "choice" && !g.busy()) { acct.error = acct.note = ""; acct.existing = null; }
+    if ((name === "choice" && !session) || (name === "reveal" && !saved && !session)) { location.replace("#" + S.account); return; }
+    if (name === "reveal" && shown !== "reveal" && !g.busy()) { acct.error = acct.note = ""; acct.existing = null; }
     if (NEEDS_DATA[name] && load.status !== "ready") {
       loadData();
       root.innerHTML = dots(waitScreen(load.status));
       return painted(name);
     }
-    // one trip for the answers: saved on its own, once (not while a save runs, after a failed one, or with the dialog up)
-    if (name === "choice") { var list = options(); if (list.length === 1 && session && !g.busy() && !acct.error && !acct.note) { st.pick = list[0].key; save(); auto = true; } }
+    // one trip for the answers: no cards, it shows on its own (back from it goes past the cards: prevStep)
+    if (name === "choice") { var list = options(); if (list.length === 1) { st.pick = list[0].key; save(); location.replace("#" + S.reveal); return; } }
     if (name === "reveal" && !thisTrip()) { st.pick = null; save(); location.replace("#" + S.choice); return; }
     if (name === "reveal" && st.pick !== revealed) {
       revealed = st.pick; try { sessionStorage.setItem("kg-revealed", revealed); } catch (e) { /* fires again */ }
@@ -727,10 +732,9 @@ if (typeof document !== "undefined") (function () {
     }
     draft = name === "days" ? st.days || Math.max(bandOf(st.band).days, least()) : PICK_KEY[name] ? (st[PICK_KEY[name]] || []).slice() : null;
     root.innerHTML = dots(screens[STEPS[step]]());
-    // tripview.js lost on the way (one dropped request): say so; the screen still finishes (the trip is saved already)
+    // tripview.js lost on the way (one dropped request): say so; the screen still finishes (Save still works)
     if (name === "reveal") try { paintTrip(); } catch (e) { document.getElementById("tv").innerHTML = '<p class="q-error">Your days would not show. Reload the page to see them.</p>'; }
     painted(name);
-    if (auto) doSave();
     if (name === "into") {
       setupDeck();
       // after an answer, focus stays on the button just used (it names the new card), not back on the heading
@@ -819,7 +823,7 @@ if (typeof document !== "undefined") (function () {
     shown = name;
     bar.style.width = PROGRESS[name] + "%";
     bar.parentNode.setAttribute("aria-valuenow", PROGRESS[name]);
-    backBtn.hidden = name === "start" || name === "reveal";
+    backBtn.hidden = name === "start" || (name === "reveal" && !!savedInfo());
     document.body.classList.toggle("q-photo", !!root.querySelector(".q-brk:not(.q-brk-card)"));
     if (notice) { root.insertAdjacentHTML("afterbegin", '<p class="q-error" role="alert">' + esc(notice) + "</p>"); notice = ""; }
     root.scrollTop = 0;
@@ -901,7 +905,8 @@ if (typeof document !== "undefined") (function () {
       if (WIDE.matches) root.querySelector('[data-act="tv-day"][data-val="' + v + '"]').focus({ preventScroll: true });
       else { document.getElementById("tv").scrollIntoView(); root.querySelector('.tv-tab[aria-pressed="true"]').focus({ preventScroll: true }); }
     }
-    else if (act === "pick") { answered("choice", v); st.pick = v; save(); doSave(); }
+    else if (act === "pick") { answered("choice", v); st.pick = v; save(); go(S.reveal); }
+    else if (act === "save") doSave();
     else if (act === "again") { tv = { pick: null, view: "trip", day: 0 }; deck = null; allTowns = allEnds = false; st = blankState(); save(); session = null; acct = { mode: "create", error: "", note: "", existing: null, email: "", optIn: false }; savedMem = null; try { sessionStorage.removeItem(SAVED); } catch (e2) { /* fine */ } go(S.start); }
     else if (act === "mode") { var ef = document.getElementById("q-email"); if (ef) acct.email = ef.value; acct.mode = v; acct.error = ""; render(); }
     else if (act === "google") goGoogle();
@@ -947,7 +952,7 @@ if (typeof document !== "undefined") (function () {
       acct = { mode: "signin", error: saveErrorMessage(401), note: "", existing: null, email: session ? session.email : "", optIn: false };
       session = null; return go(S.account);
     }
-    // any other failed save: the trip cards again with the error; a tap on a card tries again
+    // any other failed save: the trip again with the error; its button tries again
     if (session) { acct.error = err && typeof err.status === "number" ? saveErrorMessage(err.status, err.error) : authErrorMessage(""); return render(); }
     setDisabled(false); setErr(authErrorMessage(""));
   }
@@ -966,7 +971,7 @@ if (typeof document !== "undefined") (function () {
   function doSave() {
     acct.error = ""; setErr("");
     run(function () { return saveFlow(fetch.bind(window), session.idToken, newBody()); }, afterSave);
-    var sb = document.getElementById("q-status"); if (sb && g.busy()) sb.textContent = "Building your trip…"; // fail() clears it
+    var sb = document.getElementById("q-status"); if (sb && g.busy()) sb.textContent = "Saving…"; // fail() clears it
   }
   function doReplace() {
     acct.error = "";
@@ -1000,7 +1005,7 @@ if (typeof document !== "undefined") (function () {
     }, function (s) { afterSignIn(s, "email", acct.optIn); });
   });
 
-  // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until a trip is picked.
+  // Every sign-in ends here (email, Google, Apple): signed in, on to the trip cards. Nothing is saved until Save this trip.
   function afterSignIn(s, by, optIn) {
     session = s;
     if (s.isNew) {

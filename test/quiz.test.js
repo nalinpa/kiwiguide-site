@@ -431,9 +431,9 @@ const renderSrc = src.slice(src.indexOf("  function render() {"), src.indexOf(" 
 test("guard: no trip cards or trip without a sign-in or a save; the account step moves on once signed in or saved", () => {
   // account: saved already, the trip; signed in, the cards
   assert.match(renderSrc, /if \(name === "account" && \(saved \|\| session\)\) \{ location\.replace\("#" \+ \(saved \? S\.reveal : S\.choice\)\); return; \}/);
-  // choice with no session, and reveal with nothing saved: the account (no session) or the cards (a session, nothing saved yet)
-  assert.match(renderSrc, /if \(\(name === "choice" && !session\) \|\| \(name === "reveal" && !saved\)\) \{ location\.replace\("#" \+ \(session \? S\.choice : S\.account\)\); return; \}/);
-  assert.match(renderSrc, /, saved = savedInfo\(\),/);
+  // choice with no session, and the trip with neither a session (not saved yet) nor a save: the account (a reload loses the sign-in)
+  assert.match(renderSrc, /if \(\(name === "choice" && !session\) \|\| \(name === "reveal" && !saved && !session\)\) \{ location\.replace\("#" \+ S\.account\); return; \}/);
+  assert.match(renderSrc, /, saved = savedInfo\(\);/);
   // after the missing-answer check, before the data loads
   const open = renderSrc.indexOf("if (ok !== step)"), guard = renderSrc.indexOf('if (name === "account" && (saved'), data = renderSrc.indexOf("if (NEEDS_DATA[name]");
   assert.ok(open > 0 && open < guard && guard < data);
@@ -442,10 +442,11 @@ test("guard: no trip cards or trip without a sign-in or a save; the account step
   assert.match(src, /function savedInfo\(\) \{[^\n]*d\.pick && d\.pick === st\.pick/);
   // the copy in memory first: it is always the newest
   assert.match(src, /function savedInfo\(\) \{ var d = savedMem; if \(!d\) try \{ d = JSON\.parse\(sessionStorage\.getItem\(SAVED\)\); \}/);
-  // coming to the cards from another step (not a re-render after a save), nothing is left from an earlier save: no old dialog
-  // (so no Keep with no pick), no old error blocking the one-trip save
-  assert.match(renderSrc, /if \(name === "choice" && shown !== "choice" && !g\.busy\(\)\) \{ acct\.error = acct\.note = ""; acct\.existing = null; \}/);
-  const clear = renderSrc.indexOf('shown !== "choice"');
+  // coming to the trip from another step (not a re-render after a save), nothing is left from an earlier save: no old dialog
+  // (so no Keep with no pick), no old error
+  assert.match(renderSrc, /if \(name === "reveal" && shown !== "reveal" && !g\.busy\(\)\) \{ acct\.error = acct\.note = ""; acct\.existing = null; \}/);
+  assert.ok(!src.includes('shown !== "choice"'), "the cards keep nothing from a save");
+  const clear = renderSrc.indexOf('shown !== "reveal"');
   assert.ok(renderSrc.indexOf('if ((name === "choice" && !session)') < clear && clear < renderSrc.indexOf("if (NEEDS_DATA[name]"), "after the guards, before the wait screen");
   assert.match(src, /function painted\(name\) \{\s*shown = name;/);
   assert.match(src, /var NEEDS_DATA = \{ into: 1, choice: 1, reveal: 1 \};/);
@@ -453,31 +454,41 @@ test("guard: no trip cards or trip without a sign-in or a save; the account step
   assert.ok(!STEPS.includes("done"));
 });
 
-test("back: from the trip cards while signed in, the last question; none on the trip", () => {
+test("back: from the trip cards while signed in, the last question; on the trip until it is saved", () => {
   assert.equal(Q.backStep(at("choice")), at("account"));
-  assert.match(src, /function prevStep\(step\) \{\s*var name = STEPS\[step\];\s*if \(name === "choice" && session\) return S\.heard;/);
-  assert.match(src, /backBtn\.hidden = name === "start" \|\| name === "reveal";/);
-  assert.ok(!/name === "reveal"\) \{ var o = options\(\)/.test(src), "no back from the reveal");
+  assert.match(src, /function prevStep\(step\) \{\s*var name = STEPS\[step\];/);
+  assert.match(src, /if \(name === "choice" && session\) return S\.heard;/);
+  // the trip goes back to the cards, or past them with one trip (it would only show again); signed in, past the account too
+  assert.match(src, /if \(name === "reveal"\) \{ var o = options\(\); return typeof o !== "string" && o\.length === 1 \? prevStep\(S\.choice\) : S\.choice; \}/);
+  assert.ok(src.indexOf('if (name === "reveal") { var o') < src.indexOf('if (name === "choice" && session)'));
+  assert.match(src, /backBtn\.hidden = name === "start" \|\| \(name === "reveal" && !!savedInfo\(\)\);/);
 });
 
-test("single option: the choice step saves it on its own, once, and not again after an error", () => {
-  assert.match(renderSrc, /if \(name === "choice"\) \{ var list = options\(\); if \(list\.length === 1 && session && !g\.busy\(\) && !acct\.error && !acct\.note\) \{ st\.pick = list\[0\]\.key; save\(\); auto = true; \} \}/);
-  assert.match(renderSrc, /painted\(name\);\s*if \(auto\) doSave\(\);/);
-  // picking a card saves it; the wait is said while it runs
-  assert.match(src, /act === "pick"\) \{ answered\("choice", v\); st\.pick = v; save\(\); doSave\(\); \}/);
-  assert.match(src, /function doSave\(\) \{[^]*?Building your trip…[^]*?\n  \}/);
+// Owner, 2026-11-26: "they can save by clicking a button. it doesnt have to auto save"
+test("picking a trip shows it, one trip shows on its own; nothing saves until Save this trip", () => {
+  assert.match(renderSrc, /if \(name === "choice"\) \{ var list = options\(\); if \(list\.length === 1\) \{ st\.pick = list\[0\]\.key; save\(\); location\.replace\("#" \+ S\.reveal\); return; \} \}/);
+  assert.ok(!/\bauto\b/.test(renderSrc), "no auto-save left in render");
+  assert.match(src, /act === "pick"\) \{ answered\("choice", v\); st\.pick = v; save\(\); go\(S\.reveal\); \}/);
+  assert.match(src, /act === "save"\) doSave\(\);/);
+  assert.equal((src.match(/doSave\(\)/g) || []).length, 2, "defined once, called only from the Save button");
+  assert.ok(!src.includes("Building your trip"), "no wait before the trip shows");
+  assert.match(src, /function doSave\(\) \{[^]*?"Saving…"[^]*?\n  \}/);
+  // the cards are just the cards
   const choice = screen("choice", "reveal");
   assert.match(choice, /list\.length === 1 \? "1 trip fits " : list\.length \+ " trips fit "/);
-  // the error above the cards (not with the dialog, which has its own), the Replace/Keep dialog on a pick
-  assert.match(choice, /esc\(acct\.error\)/);
-  assert.match(choice, /data-act="replace">Replace it<\/button>/);
-  assert.ok(choice.indexOf("q-status") > 0 && choice.indexOf("q-status") < choice.indexOf("list.map("), "status and error above the cards");
+  assert.ok(!/acct\.|q-status|q-err|q-dialog|session/.test(choice), "no save state on the cards");
+  // the trip, not saved: the Save button, its status and error, the Replace/Keep dialog
+  const reveal = screen("reveal", "account");
+  assert.match(reveal, /if \(!d && session && acct\.note === "has-trip"\) \{/);
+  assert.match(reveal, /data-act="replace">Replace it<\/button>/);
+  assert.match(reveal, /esc\(acct\.error\)/);
+  assert.ok(reveal.includes('id="q-status" role="status"') && reveal.includes('id="q-err" role="alert"'));
   assert.match(src, /var dlg = document\.getElementById\("q-dialog"\);\s*if \(dlg\) \{ dlg\.showModal\(\); document\.getElementById\("q-keep"\)\.focus\(\); \}/);
-  // a 401 on save: signed out, the account step in sign in mode; other save errors stay on the cards
+  // a 401 on save: signed out, the account step in sign in mode; other save errors stay on the trip, the button again
   assert.match(src, /session = null; return go\(S\.account\);/);
   assert.match(src, /if \(session\) \{ acct\.error = [^\n]*return render\(\); \}/);
-  assert.equal((src.match(/saveFlow\(/g) || []).length, 1, "only the pick saves");
-  assert.ok(!/act === "retry"|act === "save"/.test(src));
+  assert.ok(reveal.includes('(acct.error ? "Try again" : "Save this trip")'));
+  assert.equal((src.match(/saveFlow\(/g) || []).length, 1, "only the button saves");
 });
 
 test("account screen: the owner's framing, sign-in only (no save), then the trip cards", () => {
@@ -487,7 +498,7 @@ test("account screen: the owner's framing, sign-in only (no save), then the trip
   assert.ok(acc.includes(`"Sign in and we'll build your trip"`));
   assert.ok(acc.includes(`"It'll be waiting in the Kiwi Guide app when you sign in."`));
   assert.ok(!acc.includes("thisTrip") && !acc.includes("session") && !acc.includes("q-dialog"), "no trip, no Saving to, no dialog");
-  assert.ok(!src.includes("Save your trip") && !src.includes("Save this trip"));
+  assert.ok(!src.includes("Save your trip"));
   // every sign-in ends in afterSignIn: the session, sign_up for a new account, the cards
   assert.match(src, /function afterSignIn\(s, by, optIn\) \{\s*session = s;\s*if \(s\.isNew\) \{\s*track\("sign_up", \{ method: by \}\);\s*saveEmailOptIn\(fetch\.bind\(window\), s\.idToken, s\.uid, optIn\)\.catch\(function \(\) \{\}\);[^\n]*\s*\}\s*go\(S\.choice\);\s*\}/);
   assert.match(src, /\}, function \(s\) \{ afterSignIn\(s, "email", acct\.optIn\); \}\);/);
@@ -504,16 +515,18 @@ test("account screen: the owner's framing, sign-in only (no save), then the trip
   assert.ok(!/function onLoaded\(\) \{[^}]*googlePending/.test(src));
 });
 
-test("reveal is saved: Saved to, the app's two steps and Start again before the trip; no Save button", () => {
+test("reveal: saved, Saved to and the app's two steps; not saved, the Save button; Start again, all before the trip", () => {
   const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
   const reveal = screen("reveal", "account");
   assert.ok(reveal.includes('"Saved to "'));
   assert.ok(reveal.includes("/img/app-store-badge-black.svg"));
   assert.ok(reveal.includes('"<li><b>2</b><span>Sign in with " + esc(d.email) + ", and open Trips.</span></li>'));
   assert.ok(reveal.includes('data-act="again">Start again</button>'));
-  assert.ok(!src.includes('data-act="save"'));
-  const at = reveal.indexOf('"Saved to "');
-  assert.ok(reveal.indexOf('class="q-when"') < at && at < reveal.indexOf("q-steps") && reveal.indexOf("q-steps") < reveal.indexOf('<div id="tv"'), "under the when line, before the trip");
+  // saved: the lead and the steps; else (not saved) the button, never both
+  assert.match(reveal, /\(d \? '<p class="q-lead">'[^]*?<\/span><\/li><\/ol>"\s*: '<div class="q-actions q-stack"><button type="button" class="q-cta" data-act="save">'/);
+  assert.equal((src.match(/data-act="save"/g) || []).length, 1);
+  const at = reveal.indexOf('"Saved to "'), btn = reveal.indexOf('data-act="save"');
+  assert.ok(reveal.indexOf('class="q-when"') < at && at < reveal.indexOf("q-steps") && reveal.indexOf("q-steps") < btn && btn < reveal.indexOf('<div id="tv"'), "under the when line, before the trip");
   assert.ok(!src.includes("q-bottom") && !css.includes("q-bottom"), "no sticky bar left");
   // saving goes to the trip, the saved info names the trip picked
   assert.match(src, /function finish\(email, title, kept\) \{[^]*?pick: st\.pick[^]*?go\(S\.reveal\);\s*\}/);

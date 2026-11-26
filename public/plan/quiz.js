@@ -376,7 +376,7 @@ if (typeof document !== "undefined") (function () {
   var root = document.getElementById("q");
   var bar = document.getElementById("bar");
   var backBtn = document.getElementById("back");
-  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, account: 94, choice: 97, reveal: 100, done: 100 };
+  var PROGRESS = { start: 5, band: 10, days: 15, finish: 20, break1: 25, season: 30, month: 36, pace: 42, drive: 48, who: 53, age: 58, vibe: 63, break2: 67, into: 74, food: 86, heard: 91, account: 93, choice: 95, reveal: 97, done: 100 };
   var S = {}; STEPS.forEach(function (n, i) { S[n] = i; });
   var NEEDS_DATA = { into: 1, choice: 1, reveal: 1 };
   var CHIPS = [3, 5, 7, 10, 12, 14, 17, 21];

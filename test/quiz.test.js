@@ -17,7 +17,7 @@ test("steps in order: the owner's order (the finish after the days), a break aft
   const bar = JSON.parse(src.match(/var PROGRESS = (\{[^}]*\});/)[1].replace(/(\w+):/g, '"$1":'));
   assert.deepEqual(Object.keys(bar), STEPS);
   STEPS.forEach((s, i) => { if (i) assert.ok(bar[s] >= bar[STEPS[i - 1]], s); });
-  assert.deepEqual([bar.account, bar.choice, bar.reveal, bar.done], [94, 97, 100, 100]);
+  assert.deepEqual([bar.account, bar.choice, bar.reveal, bar.done], [93, 95, 97, 100]); // full only on the app step (owner, 2026-11-26)
 });
 
 test("who's travelling, age and how did you hear about us: kept with the quiz answers (analytics) only, the trip the same; age and how you heard can be skipped (owner, 2026-11-24)", () => {

@@ -22,7 +22,10 @@ function tripBody(trip, startDate, uuid) {
       }),
     };
   });
-  return { title: trip.label, startDate: startDate, endDate: days[days.length - 1].date, days: days };
+  var body = { title: trip.label, startDate: startDate, endDate: days[days.length - 1].date, days: days };
+  // The town the trip starts from: the app draws day 1's drive out of it (the api keeps it as startArea).
+  if (trip.start) body.startArea = trip.start;
+  return body;
 }
 
 function authCall(fetchFn, method, email, password) {

@@ -30,6 +30,12 @@ test("tripBody: title is the trip's label", () => {
   assert.equal(tripBody(ten, "2027-01-01", uuid).title, ten.label);
 });
 
+// The app draws day 1's drive out of the start town from it (api: itineraries' startArea, 2026-11-27).
+test("tripBody: startArea is the town the trip starts from, and left out when the trip has none", () => {
+  assert.equal(tripBody(ten, "2027-01-01", uuid).startArea, ten.start);
+  assert.equal("startArea" in tripBody({ ...ten, start: undefined }, "2027-01-01", uuid), false);
+});
+
 test("authErrorMessage", () => {
   assert.match(authErrorMessage("EMAIL_EXISTS"), /sign in/i);
   assert.match(authErrorMessage("WEAK_PASSWORD : Password should be at least 6 characters"), /6 characters/);

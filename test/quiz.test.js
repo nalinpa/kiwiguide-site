@@ -201,10 +201,21 @@ test("back never lands on a photo break, in the quiz's back button or the browse
   assert.equal(Q.backStep(at("finish")), at("days"));
   assert.equal(Q.backStep(0), 0);
   for (let s = 0; s < STEPS.length; s++) assert.doesNotMatch(STEPS[Q.backStep(s)], /^break/, STEPS[s]);
-  assert.match(src, /return backStep\(step\);/);
+  assert.match(src, /return backStep\(step, st\);/);
   // a break's Next takes the break's own place in the history, so the browser's back skips it too
   // and only from the break itself, so a double tap can't skip the question after it
   assert.match(src, /act === "next" && \/\^break\/\.test\(STEPS\[step\]\)\) location\.replace\("#" \+ \(step \+ 1\)\);/);
+});
+
+// Owner, 2026-11-27: Back from "Who's travelling?" landed on the driving question, which a long way in few days never asks
+test("back skips the driving question when the way in skipped it", () => {
+  const far = { start: "christchurch", end: "picton", days: 2 }, near = { start: "christchurch", end: "picton", days: 5 };
+  assert.ok(Q.longDrive(far.start, far.end, far.days));
+  assert.ok(!Q.longDrive(near.start, near.end, near.days));
+  assert.equal(Q.backStep(at("who"), far), at("pace"));
+  assert.equal(Q.backStep(at("who"), near), at("drive"));
+  assert.equal(Q.backStep(at("who")), at("drive"), "no answers handed in: the step before");
+  assert.equal(Q.backStep(at("pace"), far), at("month"), "only the driving question is skipped");
 });
 
 test("cleanState old shape: today's saved quiz gives a clean state at the first unanswered step", () => {

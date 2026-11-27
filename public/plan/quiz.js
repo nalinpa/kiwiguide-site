@@ -293,10 +293,13 @@ function breakLine(n, st) {
   return { line: "Over 500 places on the island. Picking the ones that fit you.", img: p.img, credit: p.credit };
 }
 
-// Back never lands on a photo break: from the screen after one it goes to the question before it.
-function backStep(step) {
+// Back never lands on a photo break: from the screen after one it goes to the question before it. Nor on the driving
+// question when the way in skipped it (longDrive; owner, 2026-11-27). st: the answers so far.
+function backStep(step, st) {
   var p = Math.max(0, step - 1);
-  return /^break/.test(STEPS[p]) ? p - 1 : p;
+  if (/^break/.test(STEPS[p])) p = p - 1;
+  if (st && STEPS[p] === "drive" && longDrive(st.start, st.end, st.days)) p = p - 1;
+  return p;
 }
 
 // The cards: a new deck opens on card 1; coming back to a finished one shows its last card again, that card's yes taken back.
@@ -515,7 +518,7 @@ if (typeof document !== "undefined") (function () {
     if (name === "reveal") { var o = options(); return typeof o !== "string" && o.length === 1 ? prevStep(S.choice) : S.choice; }
     if (name === "choice" && session) return S.heard; // signed in: the account step would only send the visitor back here
     if (name === "pace") return st.season && st.season !== "unsure" ? S.month : S.season;
-    return backStep(step);
+    return backStep(step, st);
   }
 
   function choice(label, hint, act, val, on) {
